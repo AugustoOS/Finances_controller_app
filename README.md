@@ -1,69 +1,67 @@
-# Repartição
+# Finances controller
 
-App de bolso pra repartir o salário do mês e saber, a qualquer momento, quanto ainda dá pra gastar sem furar as contas.
+**A pocket budget that answers one question: how much can I actually spend right now?**
 
-Roda no navegador, sem backend, sem conta, sem nuvem. Instalado na tela de início do celular, funciona offline e parece um app nativo.
-
----
-
-## A ideia
-
-O dinheiro do mês é dividido em **repartições** — uma faixa pra cada conta que se repete: aluguel, mercado, Uber, luz, internet, gás. Cada faixa reserva o valor que você planejou gastar nela.
-
-O que não foi reservado é a **sobra**: o número grande da primeira tela, e a única pergunta que o app existe pra responder.
-
-A regra do cálculo:
-
-```
-comprometido = Σ max(planejado, gasto real) de cada repartição
-sobra        = renda do mês − comprometido − gastos avulsos
-```
-
-Usar `max(planejado, gasto)` é o detalhe que faz a conta ser honesta: enquanto você está dentro do planejado, a faixa segura o valor cheio (a conta ainda vai chegar). Se estourar, ela passa a comprometer o que realmente saiu, e a sobra encolhe na hora.
+A single-file web app that splits your monthly income into envelopes — rent, groceries, rides, power, internet — and keeps a running total of what is genuinely free to spend. No backend, no account, no cloud. Added to your phone's home screen it runs offline and behaves like a native app.
 
 ---
 
-## As telas
+## The idea
 
-| Tela | Pra quê |
+Money is divided into **repartições** (envelopes). Each one reserves the amount you planned to spend on a recurring bill. Whatever is not reserved is the **leftover** — the big number on the first screen, and the only question this app exists to answer.
+
+```
+committed = Σ max(planned, actual) for every envelope
+leftover  = monthly income − committed − loose spending
+```
+
+The `max(planned, actual)` is the part that keeps the number honest. While you are still under budget, the envelope holds back the full planned amount, because the bill has not arrived yet. The moment you overshoot, it commits what actually left your account instead, and the leftover shrinks immediately.
+
+---
+
+## Screens
+
+| Screen | What it does |
 |---|---|
-| **Mês** | A sobra, a régua colorida mostrando pra onde o salário foi, quanto já saiu, quanto ainda vai sair e quanto dá por dia até o mês fechar. |
-| **Repartições** | Uma faixa por conta, com barra de preenchimento. Toque pra lançar um gasto, ajustar o planejado, trocar a cor ou ver os lançamentos do mês. |
-| **Casa** | Lista de compras da casa. Cada item mostra `cabe` ou `faltam R$ X` comparando com a sobra atual. Marcar como comprado lança o valor como gasto do mês. |
-| **Ajustes** | Renda do mês, renda padrão, cópia de segurança e limpeza. |
+| **Mês** (Month) | The leftover, a stacked bar showing where the salary went, what has already left, what is still coming, and how much per day until the month closes. |
+| **Repartições** (Envelopes) | One row per bill with a fill bar. Tap to log an expense, adjust the planned amount, change the colour, or review this month's entries. |
+| **Casa** (Home) | A shopping list for the apartment. Each item is tagged `cabe` (fits) or `faltam R$ X` (short by X) against the current leftover. Marking one as bought logs it as spending for the month. |
+| **Ajustes** (Settings) | Monthly income, default income, backup and reset. |
 
-O seletor `‹ mês ›` no topo navega entre os meses. As repartições são as mesmas em todos; o que muda de um mês pro outro são os lançamentos e a renda.
+The `‹ month ›` selector at the top moves between months. Envelopes carry over unchanged; only the entries and the income differ month to month.
+
+The interface is in Brazilian Portuguese.
 
 ---
 
-## Instalação no GitHub Pages
+## Deploying to GitHub Pages
 
-1. Crie um repositório e suba o conteúdo do pacote na raiz (`index.html`, `manifest.webmanifest`, `sw.js` e os `icon-*.png`).
+1. Create a repository and put the package contents at the root: `index.html`, `manifest.webmanifest`, `sw.js` and the `icon-*.png` files.
 2. **Settings → Pages → Source: Deploy from a branch → `main` / `/ (root)`**.
-3. Em cerca de um minuto a URL fica no ar: `https://<usuario>.github.io/<repo>/`.
-4. Abra essa URL **no Safari** (no iPhone tem que ser o Safari) → botão Compartilhar → **Adicionar à Tela de Início**.
+3. After about a minute the URL is live at `https://<user>.github.io/<repo>/`.
+4. Open it **in Safari** (it has to be Safari on iOS) → Share → **Add to Home Screen**.
 
-Depois da primeira abertura o service worker guarda tudo em cache e o app abre sem internet.
+After the first load the service worker caches everything and the app opens without a connection.
 
-### Atualizando o app
+### Shipping an update
 
-Substitua `index.html` e suba um `CACHE` novo em `sw.js` (`reparticao-v1` → `reparticao-v2`). Sem trocar o nome do cache, o service worker continua servindo a versão antiga. Depois de publicar, feche e reabra o app duas vezes.
+Replace `index.html` and bump the cache name in `sw.js` (`reparticao-v1` → `reparticao-v2`). Without a new cache name the service worker keeps serving the old build. Once it is published, close and reopen the app twice.
 
 ---
 
-## Onde ficam os dados
+## Where the data lives
 
-No `localStorage` do navegador, atrelado à URL do Pages, na chave `reparticao.v1`. Nada sai do aparelho e nada é gravado nos arquivos do repositório — o que está no GitHub é só o app.
+In the browser's `localStorage`, scoped to the Pages URL, under the key `reparticao.v1`. Nothing leaves the device and nothing is written back to the repository — what sits on GitHub is only the app itself.
 
-Na prática:
+In practice:
 
-- Fechar o app, ficar semanas sem abrir, modo avião: os dados continuam lá.
-- Outro aparelho abrindo a mesma URL começa zerado. Não sincroniza.
-- Limpar dados de sites do Safari apaga tudo junto.
+- Close the app, ignore it for weeks, fly in airplane mode: the data is still there.
+- Another device on the same URL starts empty. There is no sync.
+- Clearing Safari's website data wipes it along with everything else.
 
-Por isso existe a caixa de **cópia de segurança** em Ajustes: o texto ali é o seu histórico inteiro em JSON. Copie de vez em quando e mande pra você mesmo. Pra restaurar (ou migrar de aparelho), cole o texto no lugar e toque em Restaurar.
+That is why **Ajustes** carries a backup box: the text in it is your entire history as JSON. Copy it now and then and send it to yourself. To restore it — or to move to another phone — paste the text back and tap Restaurar.
 
-### Formato do backup
+### Backup format
 
 ```json
 {
@@ -75,28 +73,28 @@ Por isso existe a caixa de **cópia de segurança** em Ajustes: o texto ali é o
 }
 ```
 
-`pid` é o id da repartição; `null` significa gasto avulso. `prio` vai de 1 (pode esperar) a 3 (alta).
+`pid` is the envelope id; `null` marks loose spending. `prio` runs from 1 (can wait) to 3 (high).
 
 ---
 
-## Arquivos
+## Files
 
 ```
-index.html              app inteiro — HTML, CSS e JS em um arquivo só, sem dependências
-manifest.webmanifest    nome, ícones e modo standalone
-sw.js                   service worker, cache-first, pro app abrir offline
-icon-180.png            atalho da tela de início (iOS)
-icon-192/512.png        ícones do manifest
-icon-512-maskable.png   ícone adaptativo (Android)
+index.html              the whole app — HTML, CSS and JS in one file, no dependencies
+manifest.webmanifest    name, icons, standalone display mode
+sw.js                   cache-first service worker, so the app opens offline
+icon-180.png            home screen shortcut (iOS)
+icon-192/512.png        manifest icons
+icon-512-maskable.png   adaptive icon (Android)
 ```
 
-Sem build, sem `npm install`, sem framework. Editar é abrir o `index.html`.
+No build step, no `npm install`, no framework. Editing means opening `index.html`.
 
 ---
 
-## Limitações conhecidas
+## Known limits
 
-- Um aparelho só. Migração é via backup manual.
-- Não separa cartão de crédito por fatura — um gasto no crédito entra no mês em que foi lançado, não no mês do vencimento.
-- Não tem categoria de receita variável dentro do mês: entrou dinheiro extra, você ajusta a renda do mês na mão.
-- Recorrência é implícita: as repartições se repetem, os lançamentos não. Todo mês você lança de novo.
+- One device only. Moving between phones is a manual backup and restore.
+- Credit card purchases are not split by statement — an expense lands in the month it was logged, not the month the bill is due.
+- No variable income inside the month: if extra money comes in, you edit the month's income by hand.
+- Recurrence is implicit. Envelopes repeat, entries do not — you log them again every month.
