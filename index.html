@@ -32,7 +32,7 @@ body{
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
   font-size:16px;line-height:1.45;
   -webkit-font-smoothing:antialiased;
-  padding-bottom:calc(72px + env(safe-area-inset-bottom));
+  padding-bottom:calc(82px + env(safe-area-inset-bottom));
 }
 button,input,select,textarea{font:inherit;color:inherit}
 button{background:none;border:0;padding:0;cursor:pointer}
@@ -286,17 +286,22 @@ textarea{min-height:120px;font-size:13px;font-family:ui-monospace,Menlo,monospac
   -webkit-backdrop-filter:saturate(180%) blur(12px);
   border-top:1px solid var(--line);
   display:flex;padding-bottom:env(safe-area-inset-bottom);
+  overflow-x:auto;overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;scroll-behavior:smooth;
+  scroll-snap-type:x proximity;
 }
+.tabs::-webkit-scrollbar{display:none}
 .tab{
-  flex:1;padding:8px 1px 9px;text-align:center;color:var(--muted);
-  font-size:9.5px;font-weight:550;letter-spacing:-.01em;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  flex:0 0 auto;min-width:72px;padding:9px 8px 10px;text-align:center;color:var(--muted);
+  font-size:11px;font-weight:550;white-space:nowrap;
+  scroll-snap-align:center;
 }
-.tab svg{display:block;margin:0 auto 3px;width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tab svg{display:block;margin:0 auto 4px;width:27px;height:27px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .nav-mes.eng svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .tab[aria-current=true]{color:var(--brand)}
 .toast{
-  position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom));
+  position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));
   transform:translate(-50%,10px);z-index:60;
   background:var(--ink);color:#fff;padding:10px 16px;border-radius:20px;font-size:14px;
   opacity:0;pointer-events:none;transition:all .22s ease;
@@ -323,6 +328,8 @@ textarea{min-height:120px;font-size:13px;font-family:ui-monospace,Menlo,monospac
   <button class="tab" data-tab="cartao"><svg viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10.5h18M6.5 15h4"/></svg>Cartão</button>
   <button class="tab" data-tab="cofre"><svg viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><circle cx="12" cy="12" r="2.7"/><path d="M6.5 18.5v2M17.5 18.5v2"/></svg>Cofre</button>
   <button class="tab" data-tab="casa"><svg viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M9.5 21v-6h5v6"/></svg>Casa</button>
+  <button class="tab" data-tab="historico"><svg viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4.5V9H8"/><path d="M12 7.5V12l3 1.8"/></svg>Histórico</button>
+  <button class="tab" data-tab="ajustes"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6"/></svg>Ajustes</button>
 </nav>
 
 <div class="backdrop" id="backdrop"></div>
@@ -344,8 +351,9 @@ var hoje = new Date();
 var COFRE_PADRAO = {pct:20, base:"sobra", objetivo:{nome:"", valor:0}, movimentos:[]};
 
 var S = {
-  rendas: {},        /* mês -> [{id,nome,valor,dia,recebido}] */
-  rendaModelo: [],   /* recebimentos que se repetem todo mês */
+  rendaModelo: [],   /* renda fixa: entra todo mês, na mesma data */
+  ganhos: {},        /* mês -> [{id,nome,valor,dia,recebido}] só daquele mês */
+  recebidos: {},     /* "mês|idDaFixa" -> true/false quando marcado na mão */
   particoes: [],     /* {id,nome,planejado,cor,parcelas:[{id,dia,valor}]} */
   gastos: {},
   compras: [],
@@ -363,21 +371,41 @@ function uid(){ return Math.random().toString(36).slice(2,9); }
 
 function aplicarDados(d){
   if(!d || typeof d !== "object") return;
-  S.rendas = (d.rendas && typeof d.rendas === "object") ? d.rendas : {};
   S.rendaModelo = Array.isArray(d.rendaModelo) ? d.rendaModelo : [];
+  S.ganhos = (d.ganhos && typeof d.ganhos === "object") ? d.ganhos : {};
+  S.recebidos = (d.recebidos && typeof d.recebidos === "object") ? d.recebidos : {};
   S.particoes = Array.isArray(d.particoes) ? d.particoes : [];
   S.gastos = (d.gastos && typeof d.gastos === "object") ? d.gastos : {};
   S.compras = Array.isArray(d.compras) ? d.compras : [];
 
-  /* cópias antigas guardavam a renda como um número por mês */
-  var legado = (d.renda && typeof d.renda === "object") ? d.renda : {};
-  Object.keys(legado).forEach(function(m){
-    var v = Number(legado[m]) || 0;
-    if(v > 0 && !(S.rendas[m] && S.rendas[m].length))
-      S.rendas[m] = [{id:uid(), nome:"Renda", valor:v, dia:5}];
-  });
   if(!S.rendaModelo.length && Number(d.rendaPadrao) > 0)
     S.rendaModelo = [{id:uid(), nome:"Renda", valor:Number(d.rendaPadrao), dia:5}];
+
+  /* cópias antigas tinham uma lista mensal que substituía a fixa.
+     Agora a fixa vale sempre e o mês guarda só o que entrou a mais. */
+  var mensais = (d.rendas && typeof d.rendas === "object") ? d.rendas : {};
+  var ehFixa = {};
+  S.rendaModelo.forEach(function(r){ ehFixa[r.id] = true; });
+  Object.keys(mensais).forEach(function(m){
+    if(!Array.isArray(mensais[m]) || Array.isArray(S.ganhos[m])) return;
+    var extras = [];
+    mensais[m].forEach(function(r){
+      if(!ehFixa[r.id]){ extras.push(r); return; }
+      if(r.recebido === true || r.recebido === false) S.recebidos[m + "|" + r.id] = r.recebido;
+    });
+    if(extras.length) S.ganhos[m] = extras;
+  });
+
+  /* mais antigo ainda: um número por mês. O que passar da fixa vira ganho. */
+  if(!Object.keys(mensais).length){
+    var numeros = (d.renda && typeof d.renda === "object") ? d.renda : {};
+    var fixaTotal = totalRendas(S.rendaModelo);
+    Object.keys(numeros).forEach(function(m){
+      var dif = (Number(numeros[m]) || 0) - fixaTotal;
+      if(dif > 0.005 && !Array.isArray(S.ganhos[m]))
+        S.ganhos[m] = [{id:uid(), nome:"Complemento", valor:dif, dia:5}];
+    });
+  }
 
   S.particoes.forEach(function(p){
     if(!Array.isArray(p.parcelas)) p.parcelas = [];
@@ -407,11 +435,13 @@ function totalRendas(arr){
   return (arr||[]).reduce(function(t,r){ return t + (Number(r.valor)||0); }, 0);
 }
 function dados(){
-  var legado = {};
-  Object.keys(S.rendas).forEach(function(m){ legado[m] = totalRendas(S.rendas[m]); });
+  var legado = {}, vistos = {};
+  Object.keys(S.ganhos).forEach(function(m){ vistos[m] = true; });
+  Object.keys(S.gastos).forEach(function(m){ vistos[m] = true; });
+  Object.keys(vistos).forEach(function(m){ legado[m] = rendaDoMes(m); });
   return {
-    v:3,
-    rendas:S.rendas, rendaModelo:S.rendaModelo,
+    v:4,
+    rendaModelo:S.rendaModelo, ganhos:S.ganhos, recebidos:S.recebidos,
     renda:legado, rendaPadrao:totalRendas(S.rendaModelo),
     particoes:S.particoes, gastos:S.gastos, compras:S.compras,
     cartoes:S.cartoes, comprasCartao:S.comprasCartao, faturas:S.faturas,
@@ -465,24 +495,26 @@ function diasNoMes(m){ var p = m.split("-"); return new Date(+p[0], +p[1], 0).ge
 function diaDeHoje(m){ var a = new Date(); return chaveMes(a) === m ? a.getDate() : null; }
 function limitaDia(m, dia){ return Math.min(Math.max(1, Math.round(Number(dia)||1)), diasNoMes(m)); }
 
-/* ---- recebimentos ---- */
-function rendasDoMes(m){
-  var arr = S.rendas[m];
-  if(Array.isArray(arr)) return arr;
-  return (S.rendaModelo||[]).map(function(r){
-    return {id:r.id, nome:r.nome, valor:r.valor, dia:r.dia, doModelo:true};
+/* ---- renda fixa e ganhos do mês ---- */
+function fixosDoMes(m){
+  return (S.rendaModelo || []).map(function(r){
+    return {id:r.id, nome:r.nome, valor:Number(r.valor)||0, dia:limitaDia(m, r.dia), fixa:true};
   });
 }
-function materializarRendas(m){
-  if(!Array.isArray(S.rendas[m]))
-    S.rendas[m] = rendasDoMes(m).map(function(r){
-      return {id:r.id, nome:r.nome, valor:Number(r.valor)||0, dia:limitaDia(m, r.dia)};
-    });
-  return S.rendas[m];
+function ganhosDoMes(m){
+  return Array.isArray(S.ganhos[m]) ? S.ganhos[m] : [];
+}
+function rendasDoMes(m){
+  var lista = fixosDoMes(m).concat(ganhosDoMes(m).map(function(g){
+    return {id:g.id, nome:g.nome, valor:Number(g.valor)||0, dia:limitaDia(m, g.dia), recebido:g.recebido, fixa:false};
+  }));
+  lista.sort(function(a,c){ return a.dia - c.dia; });
+  return lista;
 }
 function rendaRecebida(m, r){
-  if(r.recebido === true) return true;
-  if(r.recebido === false) return false;
+  var marca = r.fixa ? S.recebidos[m + "|" + r.id] : r.recebido;
+  if(marca === true) return true;
+  if(marca === false) return false;
   var hd = diaDeHoje(m);
   if(hd === null) return m < mesAtual();
   return limitaDia(m, r.dia) <= hd;
@@ -570,6 +602,21 @@ function usadoDoCartao(cid){
   return Math.round(t * 100) / 100;
 }
 function limiteLivre(ct){ return (Number(ct.limite)||0) - usadoDoCartao(ct.id); }
+function situacaoCompra(c, m){
+  var n = nParcelas(c), ini = c.inicio || m;
+  var pagas = 0, restante = 0;
+  for(var k=1;k<=n;k++){
+    if(faturaPaga(c.cartao, mesVizinho(ini, k-1))) pagas++;
+    else restante += valorParcela(c, k);
+  }
+  return {
+    n:n, pagas:pagas, k:parcelaNoMes(c, m),
+    restante:Math.round(restante * 100) / 100,
+    valor:valorParcela(c, 1),
+    inicio:ini, fim:mesVizinho(ini, n-1),
+    quitada: pagas >= n, futura: ini > m
+  };
+}
 function compromissoFuturo(cid, m){
   var t = 0, ultimo = null;
   S.comprasCartao.forEach(function(c){
@@ -654,7 +701,7 @@ function diasRestantes(m){
 
 /* ========== histórico ========== */
 function temRegistro(m){
-  if(Array.isArray(S.rendas[m]) && S.rendas[m].length) return true;
+  if(ganhosDoMes(m).length) return true;
   if((S.gastos[m] || []).length) return true;
   if(movimentosCofre(m).length) return true;
   if(faturasDoMes(m).total > 0) return true;
@@ -677,8 +724,12 @@ function limparAntigos(){
   Object.keys(S.gastos).forEach(function(m){
     if(m < corte){ n += (S.gastos[m] || []).length; delete S.gastos[m]; }
   });
-  Object.keys(S.rendas).forEach(function(m){
-    if(m < corte){ n += (S.rendas[m] || []).length; delete S.rendas[m]; }
+  Object.keys(S.ganhos).forEach(function(m){
+    if(m < corte){ n += (S.ganhos[m] || []).length; delete S.ganhos[m]; }
+  });
+  Object.keys(S.recebidos).forEach(function(k){
+    var mm = k.split("|")[0];
+    if(mm && mm < corte) delete S.recebidos[k];
   });
   /* as compras quitadas saem antes das faturas, que são a prova de pagamento */
   S.comprasCartao = S.comprasCartao.filter(function(c){
@@ -720,7 +771,7 @@ function agendaDoMes(m){
     evs.push({
       tipo:"in", dia:limitaDia(m, r.dia), nome:r.nome || "Recebimento",
       valor:Number(r.valor)||0, feito:rendaRecebida(m, r),
-      rid:r.id, doModelo:!!r.doModelo
+      rid:r.id, fixa:!!r.fixa
     });
   });
   S.particoes.forEach(function(p){
@@ -794,7 +845,7 @@ function conselhos(m, b){
 
   if(b.renda <= 0){
     out.push({n:"dica", t:"Falta dizer quanto entra",
-      x:"Sem renda cadastrada não dá pra calcular sobra nenhuma. Cadastre os recebimentos com a data em que caem — pode ser mais de um: salário, adiantamento, freela."});
+      x:"Sem renda cadastrada não dá pra calcular sobra nenhuma. Cadastre a renda fixa com o dia em que ela cai. O que entrar fora disso vira ganho do mês."});
     if(!S.cartoes.length && !S.particoes.length) return out;
   }
 
@@ -1009,8 +1060,13 @@ function render(){
     (b.aindaEntra > 0.5 ? " · " + fmtCurto(b.jaEntrou) + " já caiu" : "");
 
   var tabs = document.querySelectorAll(".tab");
-  for(var i=0;i<tabs.length;i++)
-    tabs[i].setAttribute("aria-current", tabs[i].dataset.tab === S.aba ? "true" : "false");
+  var ativa = null;
+  for(var i=0;i<tabs.length;i++){
+    var eAtual = tabs[i].dataset.tab === S.aba;
+    tabs[i].setAttribute("aria-current", eAtual ? "true" : "false");
+    if(eAtual) ativa = tabs[i];
+  }
+  centralizarAba(ativa);
 
   if(S.aba === "mes") viewMes(b);
   else if(S.aba === "agenda") viewAgenda(b);
@@ -1024,13 +1080,23 @@ function render(){
   window.scrollTo(0, y);
 }
 
+function centralizarAba(ativa){
+  try{
+    var barra = document.getElementById("tabs");
+    if(!ativa || !barra || barra.scrollWidth <= barra.clientWidth + 4) return;
+    var alvo = ativa.offsetLeft - (barra.clientWidth - ativa.offsetWidth) / 2;
+    barra.scrollLeft = Math.max(0, Math.min(alvo, barra.scrollWidth - barra.clientWidth));
+  }catch(e){}
+}
+
 function viewMes(b){
   if(b.renda <= 0 && S.particoes.length === 0){
     view.innerHTML =
       '<h2>Vamos começar pelo começo</h2>'+
       '<p class="sub">Diga quanto entra por mês. Depois você reparte esse dinheiro nas contas que se repetem, e o que sobrar é seu pra usar.</p>'+
       '<div class="vazio">Nenhuma renda cadastrada ainda.</div>'+
-      '<button class="acao" data-act="editar-renda">Definir minha renda</button>';
+      '<button class="acao" data-act="nova-fixa">Cadastrar minha renda fixa</button>'+
+      '<button class="acao leve" data-act="novo-ganho">Ganho deste mês</button>';
     return;
   }
 
@@ -1094,7 +1160,8 @@ function viewMes(b){
     diaria+
     blocoConselhos(S.mes, b)+
     '<button class="acao" data-act="gasto-livre">Lançar um gasto avulso</button>'+
-    '<button class="acao leve" data-act="editar-renda">Recebimentos do mês</button>'+
+    '<button class="acao leve" data-act="novo-ganho">Ganho deste mês</button>'+
+    '<button class="acao leve" data-act="editar-renda">Renda do mês</button>'+
     '<button class="acao leve" data-act="ir-historico">Ver os últimos 12 meses</button>';
 }
 function linha(rot, val, forte){
@@ -1138,13 +1205,13 @@ function viewAgenda(b){
       var cls = "ev" + (e.feito ? " feito" : "") + (hd !== null && e.dia === hd ? " hoje" : "") + (atrasado ? " atrasado" : "");
       var rot;
       if(e.tipo === "in")
-        rot = (e.feito ? "recebido" : "a receber") + (e.doModelo ? " · repete todo mês" : "");
+        rot = (e.feito ? "recebido" : "a receber") + (e.fixa ? " · renda fixa" : " · ganho do mês");
       else if(e.tipo === "fatura")
         rot = (e.feito ? "fatura paga" : "fatura em aberto") + " · " + e.itens + (e.itens === 1 ? " parcela" : " parcelas") + (atrasado ? " · atrasada" : "");
       else
         rot = (e.feito ? "pago" : (e.pago > 0 ? "falta " + fmt(e.restante) : "a pagar") + (atrasado ? " · atrasado" : ""));
       var act = e.tipo === "in"
-        ? 'data-act="abrir-receb" data-id="'+e.rid+'"'
+        ? 'data-act="'+(e.fixa ? "abrir-fixo" : "abrir-ganho")+'" data-id="'+e.rid+'"'
         : (e.tipo === "fatura"
             ? 'data-act="ir-cartao" data-id="'+e.cid+'"'
             : 'data-act="abrir-part" data-id="'+e.pid+'"');
@@ -1160,7 +1227,7 @@ function viewAgenda(b){
   }
 
   html += blocoConselhos(m, b, "Atenção nas datas", ["alerta","atencao"])+
-    '<button class="acao" data-act="novo-receb">Adicionar recebimento</button>'+
+    '<button class="acao" data-act="novo-ganho">Ganho deste mês</button>'+
     '<button class="acao leve" data-act="nova-part">Criar repartição com vencimento</button>';
   view.innerHTML = html;
 }
@@ -1259,11 +1326,13 @@ function viewCartao(b){
           }).join("")+'</div>'
         : '<p class="dica-campo">Nenhuma parcela cai neste mês.</p>')+
       (cfut.total > 0 ? '<p class="dica-campo">Depois deste mês ainda faltam '+fmt(cfut.total)+' em parcelas, até '+nomeMes(cfut.ultimo)+'.</p>' : '')+
+      listaComprasCartao(ct, m)+
       (f.total > 0
         ? (f.pago
             ? '<button class="acao leve" data-act="desfazer-fatura" data-id="'+ct.id+'">Desmarcar fatura paga</button>'
             : '<button class="acao" data-act="pagar-fatura" data-id="'+ct.id+'">Marcar fatura como paga</button>')
         : '')+
+      '<button class="acao leve" data-act="abrir-cartao" data-id="'+ct.id+'">Editar cartão</button>'+
     '</div>';
   });
 
@@ -1271,6 +1340,43 @@ function viewCartao(b){
     '<button class="acao" data-act="nova-compra">Lançar compra no cartão</button>'+
     '<button class="acao leve" data-act="novo-cartao">Adicionar cartão</button>';
   view.innerHTML = html;
+}
+
+function listaComprasCartao(ct, m){
+  var compras = S.comprasCartao.filter(function(c){ return c.cartao === ct.id; });
+  if(!compras.length)
+    return '<label>Compras neste cartão</label>'+
+      '<div class="vazio">Nenhuma compra lançada. Toque em lançar compra e diga o valor e em quantas vezes.</div>';
+
+  var info = compras.map(function(c){ return {c:c, st:situacaoCompra(c, m)}; });
+  info.sort(function(a,b2){
+    var pa = a.st.quitada ? 2 : (a.st.futura ? 1 : 0);
+    var pb = b2.st.quitada ? 2 : (b2.st.futura ? 1 : 0);
+    return pa - pb || b2.st.restante - a.st.restante;
+  });
+  var emAberto = info.reduce(function(t,x){ return t + x.st.restante; }, 0);
+
+  return '<label>Compras neste cartão</label>'+
+    '<div class="lista">'+info.map(function(x){
+      var c = x.c, st = x.st;
+      var pct = st.n > 0 ? Math.min(100, st.pagas / st.n * 100) : 0;
+      var estado = st.quitada
+        ? 'quitada'
+        : (st.futura
+            ? 'começa em ' + nomeMes(st.inicio)
+            : (st.k ? 'parcela ' + st.k + ' de ' + st.n : 'entre ' + nomeMes(st.inicio) + ' e ' + nomeMes(st.fim)));
+      return '<button class="item" data-act="abrir-compra" data-id="'+c.id+'">'+
+        '<div class="item-topo">'+
+          '<span class="item-nome"><em'+(st.quitada ? ' style="color:var(--muted)"' : '')+'>'+esc(c.nome)+'</em></span>'+
+          '<span class="item-val num">'+fmt(st.valor)+(st.n > 1 ? ' <small>x'+st.n+'</small>' : ' <small>à vista</small>')+'</span>'+
+        '</div>'+
+        (st.n > 1 ? '<div class="barra"><div style="width:'+pct+'%;background:'+(st.quitada ? "var(--free)" : (ct.cor || CORES[0]))+'"></div></div>' : '')+
+        '<div class="item-pe"><span>'+estado+'</span>'+
+          '<span>'+(st.quitada ? 'total ' + fmtCurto(c.total) : 'faltam ' + fmtCurto(st.restante))+'</span></div>'+
+      '</button>';
+    }).join("")+'</div>'+
+    '<p class="dica-campo">'+compras.length+(compras.length === 1 ? ' compra' : ' compras')+
+      ' neste cartão, '+fmt(emAberto)+' ainda por pagar. Toque em qualquer uma para mudar valor, vezes ou mês de início.</p>';
 }
 
 function viewCofre(b){
@@ -1448,10 +1554,10 @@ function viewAjustes(b){
   view.innerHTML =
     '<h2>Ajustes</h2><p class="sub">Renda, histórico, cópia de segurança e limpeza.</p>'+
     '<div class="lista">'+
-      '<button class="item" data-act="editar-renda"><div class="item-topo"><span class="item-nome"><em>Recebimentos deste mês</em></span><span class="item-val num">'+fmt(b.renda)+'</span></div>'+
-        '<div class="item-pe"><span>'+b.rendas.length+(b.rendas.length === 1 ? ' entrada' : ' entradas')+' com data</span><span></span></div></button>'+
-      '<button class="item" data-act="editar-modelo"><div class="item-topo"><span class="item-nome"><em>Recebimentos que se repetem</em></span><span class="item-val num">'+fmt(totalRendas(S.rendaModelo))+'</span></div>'+
-        '<div class="item-pe"><span>valem nos meses que você não editar</span><span></span></div></button>'+
+      '<button class="item" data-act="editar-renda"><div class="item-topo"><span class="item-nome"><em>Renda deste mês</em></span><span class="item-val num">'+fmt(b.renda)+'</span></div>'+
+        '<div class="item-pe"><span>fixa mais '+ganhosDoMes(S.mes).length+(ganhosDoMes(S.mes).length === 1 ? ' ganho do mês' : ' ganhos do mês')+'</span><span></span></div></button>'+
+      '<button class="item" data-act="editar-fixos"><div class="item-topo"><span class="item-nome"><em>Renda fixa</em></span><span class="item-val num">'+fmt(totalRendas(S.rendaModelo))+'</span></div>'+
+        '<div class="item-pe"><span>entra todo mês, em qualquer mês</span><span></span></div></button>'+
       '<button class="item" data-act="ir-historico"><div class="item-topo"><span class="item-nome"><em>Histórico dos 12 meses</em></span><span class="item-val" style="color:var(--muted);font-weight:400">abrir</span></div>'+
         '<div class="item-pe"><span>o que entrou, saiu e sobrou em cada mês</span><span></span></div></button>'+
     '</div>'+
@@ -1512,91 +1618,110 @@ function nomeMes(m){
   return MESES[(+p[1])-1] + " de " + p[0];
 }
 
+function linhaReceb(m, r, acao){
+  var rec = rendaRecebida(m, r);
+  return '<button class="item" data-act="'+acao+'" data-id="'+r.id+'">'+
+    '<div class="item-topo">'+
+      '<span class="item-nome"><em>'+esc(r.nome || "Recebimento")+'</em></span>'+
+      '<span class="item-val num">'+fmt(r.valor)+'</span>'+
+    '</div>'+
+    '<div class="item-pe"><span>dia '+limitaDia(m, r.dia)+' · '+(rec ? 'já caiu' : 'a receber')+'</span>'+
+      '<span>'+(r.fixa ? 'todo mês' : 'só neste mês')+'</span></div>'+
+  '</button>';
+}
+
 function sheetRecebimentos(){
   var m = S.mes;
-  var rs = rendasDoMes(m);
-  var proprio = Array.isArray(S.rendas[m]);
+  var fixos = fixosDoMes(m);
+  var extras = ganhosDoMes(m).map(function(g){
+    return {id:g.id, nome:g.nome, valor:g.valor, dia:g.dia, recebido:g.recebido, fixa:false};
+  });
   abrirSheet(
-    '<h3>Recebimentos de '+nomeMes(m)+'</h3>'+
-    '<p class="sub">Salário, adiantamento, freela, aluguel recebido: cada um com o dia em que cai na conta. A soma é a renda do mês.</p>'+
-    (rs.length
-      ? '<div class="lista">'+rs.map(function(r){
-          var rec = rendaRecebida(m, r);
-          return '<button class="item" data-act="abrir-receb" data-id="'+r.id+'">'+
-            '<div class="item-topo">'+
-              '<span class="item-nome"><em>'+esc(r.nome || "Recebimento")+'</em></span>'+
-              '<span class="item-val num">'+fmt(r.valor)+'</span>'+
-            '</div>'+
-            '<div class="item-pe"><span>dia '+limitaDia(m, r.dia)+' · '+(rec ? 'já caiu' : 'a receber')+'</span>'+
-              '<span>'+(r.doModelo ? 'vem do fixo' : '')+'</span></div>'+
-          '</button>';
-        }).join("")+'</div>'
-      : '<div class="vazio">'+(proprio
-          ? 'Este mês está sem nenhum recebimento. Ele não segue mais os fixos porque a lista daqui foi editada.'
-          : 'Nenhum recebimento cadastrado.')+'</div>')+
-    '<p class="dica-campo">'+(proprio
-      ? 'Este mês tem lista própria, então mudanças nos fixos não chegam mais aqui.'
-      : 'Este mês segue os recebimentos fixos. Ao editar, adicionar ou excluir algo, ele passa a ter lista própria.')+'</p>'+
-    '<button class="acao" data-act="novo-receb">Adicionar recebimento</button>'+
-    (proprio ? '<button class="acao leve" data-act="seguir-fixos">Voltar a seguir os fixos</button>' : '')+
-    '<button class="acao leve" data-act="editar-modelo">Editar os fixos de todo mês</button>'
+    '<h3>Renda de '+nomeMes(m)+'</h3>'+
+    '<p class="sub">A renda fixa entra todo mês. O que caiu só agora, freela, bônus, venda, é ganho deste mês. Os dois somam '+fmt(rendaDoMes(m))+'.</p>'+
+    '<label>Renda fixa</label>'+
+    (fixos.length
+      ? '<div class="lista">'+fixos.map(function(r){ return linhaReceb(m, r, "abrir-fixo"); }).join("")+'</div>'
+      : '<div class="vazio">Nenhuma renda fixa cadastrada.</div>')+
+    '<label>Ganhos só de '+nomeMes(m)+'</label>'+
+    (extras.length
+      ? '<div class="lista">'+extras.map(function(r){ return linhaReceb(m, r, "abrir-ganho"); }).join("")+'</div>'
+      : '<div class="vazio">Nada além da renda fixa neste mês.</div>')+
+    '<button class="acao" data-act="novo-ganho">Ganho deste mês</button>'+
+    '<button class="acao leve" data-act="nova-fixa">Adicionar renda fixa</button>'
   );
 }
 
-function sheetModelo(){
+function sheetFixos(){
   abrirSheet(
-    '<h3>Recebimentos fixos</h3>'+
-    '<p class="sub">O que entra todo mês na mesma data. Vale para qualquer mês em que você não mexer na lista à mão.</p>'+
+    '<h3>Renda fixa</h3>'+
+    '<p class="sub">O que entra todo mês na mesma data. Vale para todos os meses, inclusive os que já passaram e os que ainda vêm.</p>'+
     (S.rendaModelo.length
       ? '<div class="lista">'+S.rendaModelo.map(function(r){
-          return '<button class="item" data-act="abrir-receb-modelo" data-id="'+r.id+'">'+
+          return '<button class="item" data-act="abrir-fixo" data-id="'+r.id+'">'+
             '<div class="item-topo">'+
-              '<span class="item-nome"><em>'+esc(r.nome || "Recebimento")+'</em></span>'+
+              '<span class="item-nome"><em>'+esc(r.nome || "Renda fixa")+'</em></span>'+
               '<span class="item-val num">'+fmt(r.valor)+'</span>'+
             '</div>'+
             '<div class="item-pe"><span>todo dia '+(Number(r.dia)||1)+'</span><span></span></div>'+
           '</button>';
         }).join("")+'</div>'
       : '<div class="vazio">Nada fixo cadastrado.</div>')+
-    '<button class="acao" data-act="novo-receb-modelo">Adicionar recebimento fixo</button>'
+    '<button class="acao" data-act="nova-fixa">Adicionar renda fixa</button>'
   );
 }
 
-function sheetRecebimento(id, noModelo){
-  var m = S.mes;
-  var lista = noModelo ? S.rendaModelo : rendasDoMes(m);
-  var r = id ? lista.filter(function(x){ return x.id === id; })[0] : null;
-  var sit = r && r.recebido === true ? "sim" : (r && r.recebido === false ? "nao" : "auto");
-  abrirSheet(
-    '<h3>'+(r ? esc(r.nome || "Recebimento") : (noModelo ? 'Novo recebimento fixo' : 'Novo recebimento'))+'</h3>'+
-    '<p class="sub">'+(noModelo
-      ? 'Vale para todo mês que você não editar na mão.'
-      : 'Só para '+nomeMes(m)+'.')+'</p>'+
-    '<label for="rn">De onde vem</label>'+
-    '<input id="rn" type="text" value="'+(r ? esc(r.nome||"") : "")+'" placeholder="Ex.: Salário, adiantamento, freela">'+
+function camposReceb(r, m, diaBruto){
+  return '<label for="rn">De onde vem</label>'+
+    '<input id="rn" type="text" value="'+(r ? esc(r.nome||"") : "")+'" placeholder="Ex.: Salário, freela, bônus">'+
     '<div class="linha2">'+
       '<div><label for="rv">Valor</label>'+
         '<input id="rv" inputmode="decimal" value="'+(r && r.valor ? String(r.valor).replace(".",",") : "")+'" placeholder="0,00"></div>'+
       '<div style="flex:0 0 118px"><label for="rd">Cai no dia</label>'+
         '<input id="rd" inputmode="numeric" value="'+(r
-          ? (noModelo ? Math.max(1, Math.min(31, Math.round(Number(r.dia)||1))) : limitaDia(m, r.dia))
+          ? (diaBruto ? Math.max(1, Math.min(31, Math.round(Number(r.dia)||1))) : limitaDia(m, r.dia))
           : 5)+'" placeholder="5"></div>'+
-    '</div>'+
-    (noModelo ? '' :
-      '<label for="rr">Situação</label>'+
-      '<select id="rr">'+
-        '<option value="auto"'+(sit === "auto" ? " selected" : "")+'>Automático pela data</option>'+
-        '<option value="sim"'+(sit === "sim" ? " selected" : "")+'>Já caiu na conta</option>'+
-        '<option value="nao"'+(sit === "nao" ? " selected" : "")+'>Ainda não caiu</option>'+
-      '</select>')+
-    '<button class="acao" data-act="salvar-receb" data-id="'+(id||"")+'" data-modelo="'+(noModelo?1:0)+'">'+(r ? 'Salvar' : 'Adicionar')+'</button>'+
-    (noModelo ? '' :
-      '<button class="acao leve" data-act="salvar-receb" data-id="'+(id||"")+'" data-modelo="0" data-fixo="1">Salvar e repetir todo mês</button>')+
-    (r ? '<button class="acao perigo" data-act="excluir-receb" data-id="'+r.id+'" data-modelo="'+(noModelo?1:0)+'">Excluir recebimento</button>' : '')+
-    (noModelo
-      ? '<p class="dica-campo">Vale nos meses que ainda seguem os fixos. Meses com lista própria não mudam.</p>'
-      : '<p class="dica-campo">Salvar aqui vale só para '+nomeMes(m)+'. O outro botão salva também nos fixos, que valem nos meses seguintes.</p>'),
+    '</div>';
+}
+
+function selectSituacao(sit){
+  return '<select id="rr">'+
+    '<option value="auto"'+(sit === "auto" ? " selected" : "")+'>Automático pela data</option>'+
+    '<option value="sim"'+(sit === "sim" ? " selected" : "")+'>Já caiu na conta</option>'+
+    '<option value="nao"'+(sit === "nao" ? " selected" : "")+'>Ainda não caiu</option>'+
+  '</select>';
+}
+
+function sheetFixo(id){
+  var m = S.mes;
+  var r = id ? S.rendaModelo.filter(function(x){ return x.id === id; })[0] : null;
+  var marca = r ? S.recebidos[m + "|" + r.id] : undefined;
+  var sit = marca === true ? "sim" : (marca === false ? "nao" : "auto");
+  abrirSheet(
+    '<h3>'+(r ? esc(r.nome || "Renda fixa") : 'Nova renda fixa')+'</h3>'+
+    '<p class="sub">Entra todo mês, sempre no mesmo dia. Valor e dia mudam para todos os meses de uma vez.</p>'+
+    camposReceb(r, m, true)+
+    (r ? '<label for="rr">Situação em '+nomeMes(m)+'</label>'+selectSituacao(sit)+
+         '<p class="dica-campo">Só a situação vale por mês. Sem mexer nela, a renda conta como recebida quando o dia chega.</p>' : '')+
+    '<button class="acao" data-act="salvar-fixa" data-id="'+(id||"")+'">'+(r ? 'Salvar' : 'Adicionar')+'</button>'+
+    (r ? '<button class="acao perigo" data-act="excluir-fixa" data-id="'+r.id+'">Excluir renda fixa</button>' : ''),
     function(){ setTimeout(function(){ var f = document.getElementById(r ? "rv" : "rn"); if(f) f.focus(); }, 120); }
+  );
+}
+
+function sheetGanho(id){
+  var m = S.mes;
+  var g = id ? ganhosDoMes(m).filter(function(x){ return x.id === id; })[0] : null;
+  var sit = g && g.recebido === true ? "sim" : (g && g.recebido === false ? "nao" : "auto");
+  abrirSheet(
+    '<h3>'+(g ? esc(g.nome || "Ganho") : 'Ganho deste mês')+'</h3>'+
+    '<p class="sub">Dinheiro que entrou só em '+nomeMes(m)+': freela, bônus, venda, presente, décimo terceiro. Não se repete nos outros meses.</p>'+
+    camposReceb(g, m, false)+
+    '<label for="rr">Situação</label>'+selectSituacao(sit)+
+    '<button class="acao" data-act="salvar-ganho" data-id="'+(id||"")+'">'+(g ? 'Salvar' : 'Lançar ganho')+'</button>'+
+    (g ? '<button class="acao leve" data-act="virar-fixa" data-id="'+g.id+'">Passar para a renda fixa</button>' : '')+
+    (g ? '<button class="acao perigo" data-act="excluir-ganho" data-id="'+g.id+'">Excluir ganho</button>' : ''),
+    function(){ setTimeout(function(){ var f = document.getElementById(g ? "rv" : "rn"); if(f) f.focus(); }, 120); }
   );
 }
 
@@ -1990,70 +2115,88 @@ document.addEventListener("click", function(ev){
     salvar(); fecharSheet(); render(); toast("Objetivo removido"); return;
   }
 
-  if(a === "seguir-fixos"){
-    delete S.rendas[S.mes];
-    salvar(); fecharSheet(); render(); toast("Este mês voltou a seguir os fixos"); return;
-  }
   if(a === "editar-renda"){ sheetRecebimentos(); return; }
-  if(a === "editar-modelo"){ sheetModelo(); return; }
-  if(a === "novo-receb"){ sheetRecebimento(null, false); return; }
-  if(a === "novo-receb-modelo"){ sheetRecebimento(null, true); return; }
-  if(a === "abrir-receb"){ sheetRecebimento(el.dataset.id, false); return; }
-  if(a === "abrir-receb-modelo"){ sheetRecebimento(el.dataset.id, true); return; }
-  if(a === "salvar-receb"){
-    var noModelo = el.dataset.modelo === "1";
-    var tambemFixo = el.dataset.fixo === "1";
-    var rnome = document.getElementById("rn").value.trim() || "Recebimento";
-    var rvalor = parseNum(document.getElementById("rv").value);
-    if(rvalor <= 0){ toast("Coloque um valor maior que zero"); return; }
-    var diaCru = Math.max(1, Math.min(31, Math.round(parseNum(document.getElementById("rd").value) || 1)));
-    var rdia = noModelo ? diaCru : limitaDia(S.mes, diaCru);
-    var rsel = document.getElementById("rr");
-    var sit = rsel ? rsel.value : "auto";
-    var rid = el.dataset.id || uid();
-    var lista = noModelo ? S.rendaModelo : materializarRendas(S.mes);
-    var achou = false;
-    lista.forEach(function(r){
-      if(r.id !== rid) return;
-      achou = true;
-      r.nome = rnome; r.valor = rvalor; r.dia = rdia;
-      if(!noModelo){
-        if(sit === "sim") r.recebido = true;
-        else if(sit === "nao") r.recebido = false;
-        else delete r.recebido;
-      }
+  if(a === "editar-fixos"){ sheetFixos(); return; }
+  if(a === "nova-fixa"){ sheetFixo(null); return; }
+  if(a === "abrir-fixo"){ sheetFixo(el.dataset.id); return; }
+  if(a === "novo-ganho"){ sheetGanho(null); return; }
+  if(a === "abrir-ganho"){ sheetGanho(el.dataset.id); return; }
+
+  if(a === "salvar-fixa"){
+    var fNome = document.getElementById("rn").value.trim() || "Renda fixa";
+    var fValor = parseNum(document.getElementById("rv").value);
+    if(fValor <= 0){ toast("Coloque um valor maior que zero"); return; }
+    var fDia = Math.max(1, Math.min(31, Math.round(parseNum(document.getElementById("rd").value) || 1)));
+    var fId = el.dataset.id || uid();
+    var achouF = false;
+    S.rendaModelo.forEach(function(r){
+      if(r.id !== fId) return;
+      achouF = true; r.nome = fNome; r.valor = fValor; r.dia = fDia;
     });
-    if(!achou){
-      var novo = {id:rid, nome:rnome, valor:rvalor, dia:rdia};
-      if(!noModelo && sit === "sim") novo.recebido = true;
-      if(!noModelo && sit === "nao") novo.recebido = false;
-      lista.push(novo);
+    if(!achouF) S.rendaModelo.push({id:fId, nome:fNome, valor:fValor, dia:fDia});
+    S.rendaModelo.sort(function(x,y){ return (Number(x.dia)||1) - (Number(y.dia)||1); });
+    var selF = document.getElementById("rr");
+    if(selF){
+      var chave = S.mes + "|" + fId;
+      if(selF.value === "sim") S.recebidos[chave] = true;
+      else if(selF.value === "nao") S.recebidos[chave] = false;
+      else delete S.recebidos[chave];
     }
-    lista.sort(function(x,y){ return (Number(x.dia)||1) - (Number(y.dia)||1); });
-
-    if(!noModelo && tambemFixo){
-      var achouFixo = false;
-      S.rendaModelo.forEach(function(r){
-        if(r.id !== rid) return;
-        achouFixo = true;
-        r.nome = rnome; r.valor = rvalor; r.dia = diaCru;
-      });
-      if(!achouFixo) S.rendaModelo.push({id:rid, nome:rnome, valor:rvalor, dia:diaCru});
-      S.rendaModelo.sort(function(x,y){ return (Number(x.dia)||1) - (Number(y.dia)||1); });
-    }
-
-    salvar(); fecharSheet(); render();
-    toast(tambemFixo ? "Salvo aqui e nos fixos" : "Recebimento salvo"); return;
+    salvar(); fecharSheet(); render(); toast("Renda fixa salva"); return;
   }
-  if(a === "excluir-receb"){
-    var xid = el.dataset.id;
-    if(el.dataset.modelo === "1"){
-      S.rendaModelo = S.rendaModelo.filter(function(r){ return r.id !== xid; });
-    }else{
-      materializarRendas(S.mes);
-      S.rendas[S.mes] = S.rendas[S.mes].filter(function(r){ return r.id !== xid; });
+  if(a === "excluir-fixa"){
+    var fX = el.dataset.id;
+    S.rendaModelo = S.rendaModelo.filter(function(r){ return r.id !== fX; });
+    Object.keys(S.recebidos).forEach(function(k){
+      if(k.split("|")[1] === fX) delete S.recebidos[k];
+    });
+    salvar(); fecharSheet(); render(); toast("Renda fixa removida"); return;
+  }
+
+  if(a === "salvar-ganho"){
+    var gNome = document.getElementById("rn").value.trim() || "Ganho";
+    var gValor = parseNum(document.getElementById("rv").value);
+    if(gValor <= 0){ toast("Coloque um valor maior que zero"); return; }
+    var gDia = limitaDia(S.mes, parseNum(document.getElementById("rd").value) || 1);
+    var selG = document.getElementById("rr");
+    var sitG = selG ? selG.value : "auto";
+    var gId = el.dataset.id || uid();
+    if(!Array.isArray(S.ganhos[S.mes])) S.ganhos[S.mes] = [];
+    var listaG = S.ganhos[S.mes], achouG = false;
+    listaG.forEach(function(x){
+      if(x.id !== gId) return;
+      achouG = true; x.nome = gNome; x.valor = gValor; x.dia = gDia;
+      if(sitG === "sim") x.recebido = true;
+      else if(sitG === "nao") x.recebido = false;
+      else delete x.recebido;
+    });
+    if(!achouG){
+      var novoG = {id:gId, nome:gNome, valor:gValor, dia:gDia};
+      if(sitG === "sim") novoG.recebido = true;
+      if(sitG === "nao") novoG.recebido = false;
+      listaG.push(novoG);
     }
-    salvar(); fecharSheet(); render(); toast("Recebimento removido"); return;
+    listaG.sort(function(x,y){ return (Number(x.dia)||1) - (Number(y.dia)||1); });
+    salvar(); fecharSheet(); render(); toast("Ganho de " + fmt(gValor) + " lançado"); return;
+  }
+  if(a === "excluir-ganho"){
+    var gX = el.dataset.id;
+    S.ganhos[S.mes] = ganhosDoMes(S.mes).filter(function(x){ return x.id !== gX; });
+    if(!S.ganhos[S.mes].length) delete S.ganhos[S.mes];
+    salvar(); fecharSheet(); render(); toast("Ganho removido"); return;
+  }
+  if(a === "virar-fixa"){
+    var vX = el.dataset.id;
+    var vG = ganhosDoMes(S.mes).filter(function(x){ return x.id === vX; })[0];
+    if(!vG) return;
+    S.rendaModelo.push({
+      id:uid(), nome:vG.nome, valor:Number(vG.valor)||0,
+      dia:Math.max(1, Math.min(31, Math.round(Number(vG.dia)||1)))
+    });
+    S.rendaModelo.sort(function(x,y){ return (Number(x.dia)||1) - (Number(y.dia)||1); });
+    S.ganhos[S.mes] = ganhosDoMes(S.mes).filter(function(x){ return x.id !== vX; });
+    if(!S.ganhos[S.mes].length) delete S.ganhos[S.mes];
+    salvar(); fecharSheet(); render(); toast("Agora entra todo mês"); return;
   }
 
   if(a === "nova-part"){ sheetParticao(null); return; }
@@ -2225,7 +2368,8 @@ document.addEventListener("click", function(ev){
     if(el.dataset.ok){
       localStorage.removeItem(KEY);
       localStorage.removeItem(KEY_ANTIGA);
-      S.rendas={}; S.rendaModelo=[]; S.particoes=[]; S.gastos={}; S.compras=[];
+      S.rendaModelo=[]; S.ganhos={}; S.recebidos={};
+      S.particoes=[]; S.gastos={}; S.compras=[];
       S.cartoes=[]; S.comprasCartao=[]; S.faturas={};
       S.cofre={pct:COFRE_PADRAO.pct, base:"sobra", objetivo:{nome:"", valor:0}, movimentos:[]};
       S.aba="mes"; render(); toast("Tudo zerado"); return;

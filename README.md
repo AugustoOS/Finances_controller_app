@@ -19,7 +19,7 @@ The `max(planned, actual)` is the part that keeps the number honest. While you a
 
 ## Dates on both sides
 
-Income is a list of **recebimentos**, one per entry, each with the day it lands: an advance on the 5th and a salary on the 20th are two separate rows, not one number. Entries that repeat every month live in a fixed model and are copied into any month you have not edited by hand.
+Income has two halves. **Renda fixa** is what arrives every month on the same day, one row per source, and it applies to every month there is, past or future. **Ganho deste mês** is money that landed once and will not repeat: a freelance job, a bonus, a sale. It is added on top of the fixed income and never leaves the month it was logged in.
 
 Envelopes carry **vencimentos** the same way. A bill due on the 10th is one parcel; a bill you split between the 10th and the 11th is two parcels with a day and an amount each. When an envelope has parcels, its monthly planned amount becomes their sum, and marking a parcel as paid logs the expense against it.
 
@@ -52,15 +52,15 @@ Money you put in leaves the free-to-spend pool and accumulates across months. Ta
 | **Mês** (Month) | The leftover, a stacked bar showing where the salary went, what has already come in, what is still coming, how much per day until the month closes, and the suggestions below it. |
 | **Agenda** | Every income and every due date in day order, with the projected balance after each line. Overdue bills are flagged, and the header carries the cash on hand today. |
 | **Repartições** (Envelopes) | One row per bill with a fill bar and its due days. Tap to log an expense, adjust the planned amount, edit the payment dates, mark a parcel as paid, change the colour, or review this month's entries. |
-| **Cartão** (Card) | One block per card: this month's bill, the instalments inside it, the free limit against the total, what is still owed after this month, and the button that settles the bill. |
+| **Cartão** (Card) | One block per card: this month's bill, the instalments inside it, the free limit against the total, and every purchase on the card with how far along it is and what it still owes. Tap a purchase to change its value, its number of instalments or its starting month, and **Editar cartão** for the limit and due day. |
 | **Cofre** (Piggy bank) | The accumulated balance, the goal if there is one, the percentage that defines how much to set aside, what that gives this month, and the deposits and withdrawals made. |
 | **Histórico** (History) | The twelve months ending on the one you are viewing: what came in, what went out and what was left in each, with the totals and the monthly average. Tap a month to open it. Reached from Mês or from Ajustes. |
 | **Casa** (Home) | A shopping list for the apartment. Each item is tagged `cabe` (fits) or `faltam R$ X` (short by X) against the current leftover. Marking one as bought logs it as spending for the month. |
 | **Ajustes** (Settings) | Income, backup and reset. Reached through the gear in the top bar rather than a tab of its own. |
 
-The `‹ month ›` selector at the top moves between months. Envelopes, cards and the piggy bank carry over unchanged; only the entries and the income differ month to month.
+The bar at the bottom scrolls sideways, and the tab you are on is brought to the centre. The `‹ month ›` selector at the top moves between months. Envelopes, cards and the piggy bank carry over unchanged; only the entries and the income differ month to month.
 
-**Fixed income versus this month's income.** A month starts out following the fixed list, so anything changed there reaches it. The moment you edit, add or delete a receipt inside a month, that month keeps its own copy and stops listening to the fixed list, which is why deleting the last receipt leaves the month at zero instead of falling back. The sheet says which of the two states the month is in, and **Voltar a seguir os fixos** hands it back to the fixed list. Editing a receipt also offers **Salvar e repetir todo mês**, which writes the same change into the fixed list.
+**Fixed income and gains never compete.** Editing the fixed income changes every month at once, and there is no per-month copy that could drift out of sync with it. A gain belongs to one month and nothing else. The only thing stored per month for a fixed receipt is whether it has already landed, which the app otherwise works out from the day. A gain that turns out to repeat can be promoted with **Passar para a renda fixa**.
 
 The interface is in Brazilian Portuguese.
 
