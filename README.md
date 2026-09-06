@@ -17,20 +17,70 @@ leftover  = monthly income − committed − loose spending
 
 The `max(planned, actual)` is the part that keeps the number honest. While you are still under budget, the envelope holds back the full planned amount, because the bill has not arrived yet. The moment you overshoot, it commits what actually left your account instead, and the leftover shrinks immediately.
 
+## Dates on both sides
+
+Income is a list of **recebimentos**, one per entry, each with the day it lands: an advance on the 5th and a salary on the 20th are two separate rows, not one number. Entries that repeat every month live in a fixed model and are copied into any month you have not edited by hand.
+
+Envelopes carry **vencimentos** the same way. A bill due on the 10th is one parcel; a bill you split between the 10th and the 11th is two parcels with a day and an amount each. When an envelope has parcels, its monthly planned amount becomes their sum, and marking a parcel as paid logs the expense against it.
+
+With both sides dated, the app walks the month event by event and shows the balance projected after each one. A month that closes with money left over can still run dry on the 11th, and that is exactly the failure the monthly leftover alone can never show.
+
+## The credit card
+
+A card is a name, a total limit and the day its bill falls due. A purchase is what you bought, how much it cost and in how many instalments, and the app spreads it across the months from the first instalment onwards, splitting the cents so the parts always add back to the total.
+
+From that it derives the three numbers a card actually needs:
+
+- **This month's bill**, instalment by instalment, each one labelled `parcela 3 de 10`, with the card's due day and whether it has been settled.
+- **The free limit**, which is the total minus every instalment still sitting in an unpaid bill. Marking a bill as paid gives that limit back, exactly like the real card.
+- **What is still owed**, the sum of every instalment dated after this month and the month the last one lands.
+
+The bill counts as committed money in the month its instalments fall, so it shrinks the leftover like any other bill, appears in its own colour on the stacked bar, and shows up in the Agenda on its due day.
+
+## The piggy bank
+
+Set a percentage and the app turns it into an amount: by default a share of what is left after every bill, or a share of the income if you prefer to save off the top. The percentage is a tap to change, and the suggestion follows the month you are looking at.
+
+Money you put in leaves the free-to-spend pool and accumulates across months. Taking it back out is a withdrawal in the month you make it. An optional goal turns the balance into a distance: how much is missing, and how many months it takes at the current rate.
+
 ---
 
 ## Screens
 
 | Screen | What it does |
 |---|---|
-| **Mês** (Month) | The leftover, a stacked bar showing where the salary went, what has already left, what is still coming, and how much per day until the month closes. |
-| **Repartições** (Envelopes) | One row per bill with a fill bar. Tap to log an expense, adjust the planned amount, change the colour, or review this month's entries. |
+| **Mês** (Month) | The leftover, a stacked bar showing where the salary went, what has already come in, what is still coming, how much per day until the month closes, and the suggestions below it. |
+| **Agenda** | Every income and every due date in day order, with the projected balance after each line. Overdue bills are flagged, and the header carries the cash on hand today. |
+| **Repartições** (Envelopes) | One row per bill with a fill bar and its due days. Tap to log an expense, adjust the planned amount, edit the payment dates, mark a parcel as paid, change the colour, or review this month's entries. |
+| **Cartão** (Card) | One block per card: this month's bill, the instalments inside it, the free limit against the total, what is still owed after this month, and the button that settles the bill. |
+| **Cofre** (Piggy bank) | The accumulated balance, the goal if there is one, the percentage that defines how much to set aside, what that gives this month, and the deposits and withdrawals made. |
+| **Histórico** (History) | The twelve months ending on the one you are viewing: what came in, what went out and what was left in each, with the totals and the monthly average. Tap a month to open it. Reached from Mês or from Ajustes. |
 | **Casa** (Home) | A shopping list for the apartment. Each item is tagged `cabe` (fits) or `faltam R$ X` (short by X) against the current leftover. Marking one as bought logs it as spending for the month. |
-| **Ajustes** (Settings) | Monthly income, default income, backup and reset. |
+| **Ajustes** (Settings) | Income, backup and reset. Reached through the gear in the top bar rather than a tab of its own. |
 
-The `‹ month ›` selector at the top moves between months. Envelopes carry over unchanged; only the entries and the income differ month to month.
+The `‹ month ›` selector at the top moves between months. Envelopes, cards and the piggy bank carry over unchanged; only the entries and the income differ month to month.
+
+**Fixed income versus this month's income.** A month starts out following the fixed list, so anything changed there reaches it. The moment you edit, add or delete a receipt inside a month, that month keeps its own copy and stops listening to the fixed list, which is why deleting the last receipt leaves the month at zero instead of falling back. The sheet says which of the two states the month is in, and **Voltar a seguir os fixos** hands it back to the fixed list. Editing a receipt also offers **Salvar e repetir todo mês**, which writes the same change into the fixed list.
 
 The interface is in Brazilian Portuguese.
+
+---
+
+## What the app tells you
+
+Below the numbers on **Mês** sits a short list of readings of the current month, ordered by urgency and capped at six. They are computed from the same data every time the screen renders, and each one names the amount and the move it implies:
+
+- **Overspending.** How much is missing to close at zero, which envelope drifted the most, how much of it is loose spending, and which pending purchase would close the gap if postponed.
+- **A hole in the cash flow.** The day the projected balance first goes negative, the bill that pushes it there, and when the next money arrives, so the choice is between moving the date and anticipating the income.
+- **Bills.** Anything overdue and unpaid, anything due within three days, and the projected balance just before it.
+- **Pace.** An envelope consuming faster than the month is passing, what it closes at if nothing changes, and the daily figure that keeps it inside the plan. Held back until a quarter of the month has gone by, so early noise does not extrapolate into a scare.
+- **A planned amount that no longer matches reality.** The average of the last three months against what is reserved today.
+- **Loose spending** past a fifth of the income, which usually means a missing envelope.
+- **Purchases.** Which item on the Casa list fits the leftover right now, or how many months of saving the top one still needs.
+- **The card.** A bill that is overdue, due within five days, or simply still open, with the cash projected just before it. A limit past 80% or fully consumed. A card eating more than a third of the income. The month an instalment plan ends and the amount it frees. Future instalments adding up to more than one month's income.
+- **The piggy bank.** How much the chosen percentage gives this month and what the balance becomes if you set it aside. A month where you saved more than the budget could take, with the amount worth withdrawing. Distance to the goal at the current rate.
+
+Reminders live inside the app. There are no push notifications, so nothing arrives when the app is closed.
 
 ---
 
@@ -45,13 +95,13 @@ After the first load the service worker caches everything and the app opens with
 
 ### Shipping an update
 
-Replace `index.html` and bump the cache name in `sw.js` (`reparticao-v1` → `reparticao-v2`). Without a new cache name the service worker keeps serving the old build. Once it is published, close and reopen the app twice.
+Replace `index.html` and bump the cache name in `sw.js` (it is at `finances-controller-v2` now, so make it `finances-controller-v3`). Without a new cache name the service worker keeps serving the old build. Once it is published, close and reopen the app twice.
 
 ---
 
 ## Where the data lives
 
-In the browser's `localStorage`, scoped to the Pages URL, under the key `reparticao.v1`. Nothing leaves the device and nothing is written back to the repository — what sits on GitHub is only the app itself.
+In the browser's `localStorage`, scoped to the Pages URL, under the key `finances.v1`. A phone still holding data from the first build, which used `reparticao.v1`, is picked up once on the next open and written back under the new key. Nothing leaves the device and nothing is written back to the repository — what sits on GitHub is only the app itself.
 
 In practice:
 
@@ -59,21 +109,23 @@ In practice:
 - Another device on the same URL starts empty. There is no sync.
 - Clearing Safari's website data wipes it along with everything else.
 
-That is why **Ajustes** carries a backup box: the text in it is your entire history as JSON. Copy it now and then and send it to yourself. To restore it — or to move to another phone — paste the text back and tap Restaurar.
+**Ajustes** saves your whole history to a file: `Salvar cópia em arquivo` writes `finances-controller-YYYY-MM-DD.json` to the phone's downloads, and `Restaurar de um arquivo` reads one back, on this device or on a new one. A copy-and-paste text box is still there behind `Ver a cópia como texto`, for the odd browser that refuses the download.
 
-### Backup format
+The format of that file, and an empty one to start from, are in [BACKUP.md](BACKUP.md). No copy of your data lives in this repository.
 
-```json
-{
-  "renda":       { "2026-09": 6500 },
-  "rendaPadrao": 6500,
-  "particoes":   [ { "id": "…", "nome": "Mercado", "planejado": 900, "cor": "#2E7D8F" } ],
-  "gastos":      { "2026-09": [ { "id": "…", "pid": "…", "valor": 347.8, "nota": "", "dia": "12/09" } ] },
-  "compras":     [ { "id": "…", "nome": "Micro-ondas", "preco": 699, "prio": 3, "compradoEm": null } ]
-}
-```
+### How much space it takes
 
-`pid` is the envelope id; `null` marks loose spending. `prio` runs from 1 (can wait) to 3 (high).
+The whole history is one JSON string, and browsers store it as UTF-16, so it costs two bytes per character. Measured on generated data:
+
+| Kept | Text | In the browser | Of a 5 MB budget |
+|---|---|---|---|
+| 1 month, 60 expenses | 7 KB | 15 KB | 0.3% |
+| 12 months, 30 expenses/month | 34 KB | 69 KB | 1.3% |
+| 12 months, 60 expenses/month | 62 KB | 123 KB | 2.4% |
+| 12 months, 120 expenses/month | 117 KB | 233 KB | 4.6% |
+| 5 years, 60 expenses/month | 299 KB | 598 KB | 11.7% |
+
+Two expenses a day for a year costs about a tenth of a megabyte, so the storage limit is not a real constraint. **Ajustes** shows the current size, and `Apagar o que tem mais de 12 meses` drops entries older than the twelve months ending on the current one: expenses, receipts, settled bills, bought items, and card purchases whose instalments have all been paid. The piggy bank balance survives that cut, folded into a single entry with no month attached.
 
 ---
 
@@ -83,6 +135,7 @@ That is why **Ajustes** carries a backup box: the text in it is your entire hist
 index.html              the whole app — HTML, CSS and JS in one file, no dependencies
 manifest.webmanifest    name, icons, standalone display mode
 sw.js                   cache-first service worker, so the app opens offline
+BACKUP.md               the backup file format, and an empty one to start from
 icon-180.png            home screen shortcut (iOS)
 icon-192/512.png        manifest icons
 icon-512-maskable.png   adaptive icon (Android)
@@ -95,6 +148,9 @@ No build step, no `npm install`, no framework. Editing means opening `index.html
 ## Known limits
 
 - One device only. Moving between phones is a manual backup and restore.
-- Credit card purchases are not split by statement — an expense lands in the month it was logged, not the month the bill is due.
-- No variable income inside the month: if extra money comes in, you edit the month's income by hand.
-- Recurrence is implicit. Envelopes repeat, entries do not — you log them again every month.
+- Card instalments follow calendar months, not the statement closing date. A purchase made after the card closes really lands on the next bill; here you get that by setting the first instalment one month ahead.
+- A card bill is settled as a whole. There is no partial payment, and paying it does not create an entry in any envelope — the bill is already committed money on its own.
+- Saving the backup relies on the browser downloading a file. Inside an iOS home-screen app that sometimes opens the JSON in a viewer instead of saving it, and the text box behind `Ver a cópia como texto` is the way out.
+- The projection starts from what this app knows, not from your bank: cash on hand is what has come in minus what has been logged out. It answers "does this month work out", not "what is my balance".
+- Recurrence is implicit. Envelopes and the fixed income model repeat; expenses do not — you log them again every month.
+- An expense logged straight into an envelope with due dates does not settle any of them. Use **marcar pago** on the parcel for that.
