@@ -35,7 +35,11 @@ From that it derives the three numbers a card actually needs:
 - **The free limit**, which is the total minus every instalment still sitting in an unpaid bill. Marking a bill as paid gives that limit back, exactly like the real card.
 - **What is still owed**, the sum of every instalment dated after this month and the month the last one lands.
 
-The bill counts as committed money in the month its instalments fall, so it shrinks the leftover like any other bill, appears in its own colour on the stacked bar, and shows up in the Agenda on its due day.
+Any expense, anywhere in the app, can be marked as paid on a card instead of in cash. That single choice decides *when* the money leaves: a cash expense leaves the account the moment you log it, while a card expense stays in the account and leaves with that card's bill. It still counts against its envelope, because the envelope tracks the category and not the payment method, and it still eats into the card's free limit. A second choice says which bill it lands on, this month's or the next one, which is how you handle buying after the card closed.
+
+Instalments and card-paid expenses are counted exactly once. The envelopes already carry the card-paid expenses, so only the instalments of card purchases are added on top as a new commitment; the bill itself appears as its own line, showing what will leave through it.
+
+Nothing goes on a card beyond its limit. A purchase, an edit to a purchase, or an expense marked as paid on a card is refused when it would exceed what is free, whether on its own or added to everything already committed there, and the refusal says how much is free and how much is missing. Paying a bill gives that space back. A card with no limit registered is not checked.
 
 ## The piggy bank
 
@@ -49,18 +53,19 @@ Money you put in leaves the free-to-spend pool and accumulates across months. Ta
 
 | Screen | What it does |
 |---|---|
-| **Mês** (Month) | The leftover, a stacked bar showing where the salary went, what has already come in, what is still coming, how much per day until the month closes, and the suggestions below it. |
+| **Mês** (Month) | The leftover, a stacked bar showing where the salary went, what has already come in, what is still coming, how much per day until the month closes, and the suggestions below it. The loose-spending line opens the month's list, where an entry can be corrected, moved into an envelope or deleted. |
+| **Renda** (Income) | Everything that comes in, in one place: the month's total split into what has already landed and what has not, the fixed income and this month's gains as two editable lists, the last six months side by side, and the two buttons that add either kind. Reached from its own tab, from the month screen and from settings. |
 | **Agenda** | Every income and every due date in day order, with the projected balance after each line. Overdue bills are flagged, and the header carries the cash on hand today. |
-| **Repartições** (Envelopes) | One row per bill with a fill bar and its due days. Tap to log an expense, adjust the planned amount, edit the payment dates, mark a parcel as paid, change the colour, or review this month's entries. |
+| **Repartições** (Envelopes) | One row per bill with a fill bar and its due days. Tap to log an expense, adjust the planned amount, edit the payment dates, mark a parcel as paid, change the colour, or review this month's entries. Each entry opens an editor where its value, name, day and envelope can be changed, or the entry deleted. |
 | **Cartão** (Card) | One block per card: this month's bill, the instalments inside it, the free limit against the total, and every purchase on the card with how far along it is and what it still owes. Tap a purchase to change its value, its number of instalments or its starting month, and **Editar cartão** for the limit and due day. |
-| **Cofre** (Piggy bank) | The accumulated balance, the goal if there is one, the percentage that defines how much to set aside, what that gives this month, and the deposits and withdrawals made. |
+| **Cofre** (Piggy bank) | The accumulated balance, the goal if there is one, the percentage that defines how much to set aside, what that gives this month, and the deposits and withdrawals made, each of which opens for editing. |
 | **Histórico** (History) | The twelve months ending on the one you are viewing: what came in, what went out and what was left in each, with the totals and the monthly average. Tap a month to open it. Reached from Mês or from Ajustes. |
 | **Casa** (Home) | A shopping list for the apartment. Each item is tagged `cabe` (fits) or `faltam R$ X` (short by X) against the current leftover. Marking one as bought logs it as spending for the month. |
-| **Ajustes** (Settings) | Income, backup and reset. Reached through the gear in the top bar rather than a tab of its own. |
+| **Ajustes** (Settings) | Appearance first: theme (automatic, light or dark), text size, and which tab the app opens on. Then income, the twelve-month history, backup, cleanup and reset, with the build version at the bottom. It is the last tab in the bar, and the gear in the top bar is a shortcut to it. |
 
-The bar at the bottom scrolls sideways, and the tab you are on is brought to the centre. The `‹ month ›` selector at the top moves between months. Envelopes, cards and the piggy bank carry over unchanged; only the entries and the income differ month to month.
+On a phone the bar at the bottom scrolls sideways, the tab you are on is brought to the centre, and its icon sits on a soft pill. On a screen 900px or wider the same bar becomes a sidebar on the left with the app name at the top, the month arrows move next to the month name, the content is centred in the remaining space, and sheets open as centred windows instead of sliding up from the bottom. The `‹ month ›` selector at the top moves between months. Envelopes, cards and the piggy bank carry over unchanged; only the entries and the income differ month to month.
 
-**Fixed income and gains never compete.** Editing the fixed income changes every month at once, and there is no per-month copy that could drift out of sync with it. A gain belongs to one month and nothing else. The only thing stored per month for a fixed receipt is whether it has already landed, which the app otherwise works out from the day. A gain that turns out to repeat can be promoted with **Passar para a renda fixa**.
+The **Renda** tab is where income lives; the month screen and settings both link to it. **Fixed income and gains never compete.** Editing the fixed income changes every month at once, and there is no per-month copy that could drift out of sync with it. A gain belongs to one month and nothing else. The only thing stored per month for a fixed receipt is whether it has already landed, which the app otherwise works out from the day. A gain that turns out to repeat can be promoted with **Passar para a renda fixa**.
 
 The interface is in Brazilian Portuguese.
 
@@ -80,6 +85,8 @@ Below the numbers on **Mês** sits a short list of readings of the current month
 - **The card.** A bill that is overdue, due within five days, or simply still open, with the cash projected just before it. A limit past 80% or fully consumed. A card eating more than a third of the income. The month an instalment plan ends and the amount it frees. Future instalments adding up to more than one month's income.
 - **The piggy bank.** How much the chosen percentage gives this month and what the balance becomes if you set it aside. A month where you saved more than the budget could take, with the amount worth withdrawing. Distance to the goal at the current rate.
 
+Every card ends with shortcuts to where the problem gets solved, and the set depends on the situation. An overspent month offers the envelope that drifted most, the loose-spending list, a withdrawal from the piggy bank when it has a balance, the shopping-list item worth postponing, a one-off gain, and the agenda. A cash gap on a given day offers the bill that causes it so its date can move, the next receipt so it can be marked as already landed, the piggy bank, and the agenda. A card bill offers marking it paid and the card itself. Shortcuts that would lead nowhere, such as withdrawing from an empty piggy bank, are not shown.
+
 Reminders live inside the app. There are no push notifications, so nothing arrives when the app is closed.
 
 ---
@@ -95,7 +102,7 @@ After the first load the service worker caches everything and the app opens with
 
 ### Shipping an update
 
-Replace `index.html` and bump the cache name in `sw.js` (it is at `finances-controller-v2` now, so make it `finances-controller-v3`). Without a new cache name the service worker keeps serving the old build. Once it is published, close and reopen the app twice.
+Replace `index.html` and push. The service worker fetches the app shell from the network on every open and only falls back to its cache when there is no connection, so a new build shows up on the next launch without touching `sw.js`. Bump `BUILD` near the top of the script when you ship, since that stamp is what **Ajustes** shows at the bottom and it is the quickest way to confirm a phone is running the version you think it is. The cache name in `sw.js` only needs to change when the list of cached files changes. On `localhost`, `127.0.0.1` or a file opened directly, the app does not register the service worker at all and removes any registration it finds, so a local server such as Live Server always shows the file as saved.
 
 ---
 
@@ -148,7 +155,7 @@ No build step, no `npm install`, no framework. Editing means opening `index.html
 ## Known limits
 
 - One device only. Moving between phones is a manual backup and restore.
-- Card instalments follow calendar months, not the statement closing date. A purchase made after the card closes really lands on the next bill; here you get that by setting the first instalment one month ahead.
+- Card instalments follow calendar months, not the statement closing date. A purchase is dated with the day it happened, anywhere from twelve months back to today, and a single choice says whether it lands on that month's bill or the next one, which is how you handle buying after the card closed.
 - A card bill is settled as a whole. There is no partial payment, and paying it does not create an entry in any envelope — the bill is already committed money on its own.
 - Saving the backup relies on the browser downloading a file. Inside an iOS home-screen app that sometimes opens the JSON in a viewer instead of saving it, and the text box behind `Ver a cópia como texto` is the way out.
 - The projection starts from what this app knows, not from your bank: cash on hand is what has come in minus what has been logged out. It answers "does this month work out", not "what is my balance".
