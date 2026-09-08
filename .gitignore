@@ -1,0 +1,16 @@
+# Seus dados ficam só no seu computador, nunca no GitHub.
+finances-controller-*.json
+*backup*.json
+*.local.json
+
+# Extratos e exportações de banco
+Nubank_*.csv
+extrato*.csv
+fatura*.csv
+
+# Rascunhos, scripts de apoio e saídas de teste
+_*.py
+_*.js
+_*.json
+_csv/
+*.log

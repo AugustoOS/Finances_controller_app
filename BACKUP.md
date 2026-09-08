@@ -26,10 +26,13 @@ Restoring a file written by an older build works. The old default income becomes
                                  { "id": "…", "pid": null, "valor": 120, "nota": "livro", "dia": "28/09",
                                    "cartao": "ct1", "fatMes": "2026-10" } ] },
   "compras":      [ { "id": "…", "nome": "Micro-ondas", "preco": 699, "prio": 3, "compradoEm": null } ],
-  "cartoes":      [ { "id": "ct1", "nome": "Nubank", "limite": 5000, "vencimento": 12, "cor": "#7A6BB5" } ],
+  "cartoes":      [ { "id": "ct1", "nome": "Nubank", "limite": 5000, "convertido": 0, "fechamento": 5,
+                      "vencimento": 12, "venceDepois": false, "cor": "#7A6BB5" } ],
   "comprasCartao":[ { "id": "…", "cartao": "ct1", "nome": "Geladeira", "total": 3000, "parcelas": 10,
                       "data": "2026-08-14", "inicio": "2026-08" } ],
-  "faturas":      { "ct1|2026-08": true },
+  "faturas":      { "ct1|2026-08": true, "ct1|2026-09": 400 },
+  "emprestimos":  [ { "id": "e1", "nome": "Empréstimo pessoal", "credor": "Banco", "valorParcela": 500,
+                      "parcelas": 24, "inicio": "2026-06", "dia": 15, "pagas": { "2026-06": true }, "cor": "#8A5A3B" } ],
   "cofre":        { "pct": 20, "base": "sobra", "objetivo": { "nome": "Reserva", "valor": 10000 },
                     "movimentos": [ { "id": "…", "mes": "2026-09", "valor": 400, "nota": "reserva", "dia": "06/09" } ] },
   "prefs":        { "tema": "auto", "textoGrande": false, "abaInicial": "mes" },
@@ -48,9 +51,10 @@ Months are always `YYYY-MM`, amounts are plain numbers in reais, and every `id` 
 | `particoes` | The envelopes. `parcelas` are the due dates: a day and an amount each. With parcels present, `planejado` is their sum. |
 | `gastos` | Expenses per month. `pid` is the envelope id and `null` means loose spending. `parc` ties the expense to one due date, which is what marks that parcel as paid. `cartao` is a card id when the expense was paid on credit: the money then leaves with that card's bill instead of now, and `fatMes` says which bill it lands on, the month it happened or the next one. An expense with no `cartao` is cash, pix or debit. |
 | `compras` | The Casa shopping list. `prio` runs from 1 (can wait) to 3 (high), and `compradoEm` is the month it was bought. |
-| `cartoes` | The cards. `vencimento` is the day the bill falls due. |
-| `comprasCartao` | Card purchases. `data` is the day it was bought, `YYYY-MM-DD`, and `inicio` is the month of the first instalment, normally the same month or the next one. Instalments for later months are derived from `inicio`, and the cents of the last one absorb the rounding. A purchase saved by an older build has no `data`, and the first day of `inicio` stands in for it. |
-| `faturas` | One key per settled bill, `cardId|month`, always `true`. A bill missing from here is still open, and its instalments still hold limit. |
+| `cartoes` | The cards. `convertido` is the slice of `limite` moved into a savings reserve at the bank, which stops counting as room to spend without changing the card's headline limit. `fechamento` is the day the bill stops taking new purchases, `vencimento` the day it falls due, and `venceDepois` says whether it is paid in the month it closes (`false`) or in the next one (`true`). With `venceDepois` absent the app infers it: a due day that falls on or before the closing day only makes sense if the charge lands the following month. A card saved before any of this existed has no `fechamento` either, and a week before the due day stands in for it. |
+| `comprasCartao` | Card purchases. `data` is the day it was bought, `YYYY-MM-DD`. Which bill the first instalment lands on is worked out from that date against the card's closing and due days, so `inicio` is written for older builds but no longer read when `data` is present; a purchase with no `data` still falls back to it. The cents of the last instalment absorb the rounding. `antecipadas` counts instalments paid off ahead of time, taken from the end of the queue: they leave every future bill and stop holding limit. |
+| `faturas` | One key per bill that has been paid, `cardId|month`. `true` means settled in one go; a number is how much has been paid so far, which is how partial and advance payments are recorded. A bill missing from here has had nothing paid, and whatever is still owed on any bill keeps holding limit. |
+| `emprestimos` | Loans paid in fixed instalments. `valorParcela` is the monthly amount, `parcelas` how many there are, `inicio` the month of the first one and `dia` the day it falls due; `pagas` holds one key per month already settled. |
 | `cofre` | The piggy bank. `base` is `sobra` or `renda`, `pct` is the share to set aside, and a negative entry in `movimentos` is a withdrawal. An entry whose `mes` is `inicial` is a balance carried over from months that were pruned. |
 | `prefs` | Appearance: `tema` is `auto`, `claro` or `escuro`; `textoGrande` is a boolean; `abaInicial` is the tab the app opens on. Travels with the backup so a new phone looks the same. |
 | `renda`, `rendaPadrao` | Written only so an older build can still read the file. The app itself ignores them; `rendaModelo` and `ganhos` are the source. |
@@ -71,6 +75,7 @@ Restoring this resets the app to a clean state, which is also what a fresh insta
   "cartoes": [],
   "comprasCartao": [],
   "faturas": {},
+  "emprestimos": [],
   "cofre": { "pct": 20, "base": "sobra", "objetivo": { "nome": "", "valor": 0 }, "movimentos": [] },
   "prefs": { "tema": "auto", "textoGrande": false, "abaInicial": "mes" },
   "renda": {},

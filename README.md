@@ -37,7 +37,17 @@ From that it derives the three numbers a card actually needs:
 
 Any expense, anywhere in the app, can be marked as paid on a card instead of in cash. That single choice decides *when* the money leaves: a cash expense leaves the account the moment you log it, while a card expense stays in the account and leaves with that card's bill. It still counts against its envelope, because the envelope tracks the category and not the payment method, and it still eats into the card's free limit. A second choice says which bill it lands on, this month's or the next one, which is how you handle buying after the card closed.
 
+A card is registered with the day its bill closes, the day it falls due, and whether it is paid in the month it closes or in the one after, which is the difference between a bill filed under September and the same bill filed under October. Everything bought between one closing and the next belongs to the same bill, and that bill carries the month it is paid, not the month of the purchases. A purchase on the 6th of a card that closes on the 5th is therefore on next month's bill, exactly as the bank shows it, and the card screen prints the window each bill covers so the two can be checked side by side.
+
+Opening the **Cartão** tab jumps the month to the bill that is still open, since that is the one being filled right now; the arrows still move freely from there.
+
 Instalments and card-paid expenses are counted exactly once. The envelopes already carry the card-paid expenses, so only the instalments of card purchases are added on top as a new commitment; the bill itself appears as its own line, showing what will leave through it.
+
+A card's spending room is its limit minus whatever slice of it has been converted into a reserve at the bank, which some banks let you do to save; the app keeps both numbers so the headline limit stays true while the room to spend shrinks by the converted part.
+
+Instalments on a purchase can be paid off ahead of time from the end of the queue: they leave every future bill, give their limit back at once, and the amount is logged as spending in the month you did it.
+
+A bill can be paid in full, in parts, or ahead of time. The card screen shows how much of it is already covered and how much is left, and any amount paid gives that much limit back immediately, which is what makes paying an open bill early worth doing.
 
 Nothing goes on a card beyond its limit. A purchase, an edit to a purchase, or an expense marked as paid on a card is refused when it would exceed what is free, whether on its own or added to everything already committed there, and the refusal says how much is free and how much is missing. Paying a bill gives that space back. A card with no limit registered is not checked.
 
@@ -58,6 +68,7 @@ Money you put in leaves the free-to-spend pool and accumulates across months. Ta
 | **Agenda** | Every income and every due date in day order, with the projected balance after each line. Overdue bills are flagged, and the header carries the cash on hand today. |
 | **Repartições** (Envelopes) | One row per bill with a fill bar and its due days. Tap to log an expense, adjust the planned amount, edit the payment dates, mark a parcel as paid, change the colour, or review this month's entries. Each entry opens an editor where its value, name, day and envelope can be changed, or the entry deleted. |
 | **Cartão** (Card) | One block per card: this month's bill, the instalments inside it, the free limit against the total, and every purchase on the card with how far along it is and what it still owes. Tap a purchase to change its value, its number of instalments or its starting month, and **Editar cartão** for the limit and due day. |
+| **Empréstimo** (Loans) | What you owe in fixed instalments: the outstanding total, what falls due this month, and one row per loan with how far along it is and how much is left. Each instalment is committed money in the month it falls due and shows up in the Agenda on its day. |
 | **Cofre** (Piggy bank) | The accumulated balance, the goal if there is one, the percentage that defines how much to set aside, what that gives this month, and the deposits and withdrawals made, each of which opens for editing. |
 | **Histórico** (History) | The twelve months ending on the one you are viewing: what came in, what went out and what was left in each, with the totals and the monthly average. Tap a month to open it. Reached from Mês or from Ajustes. |
 | **Casa** (Home) | A shopping list for the apartment. Each item is tagged `cabe` (fits) or `faltam R$ X` (short by X) against the current leftover. Marking one as bought logs it as spending for the month. |
@@ -155,7 +166,7 @@ No build step, no `npm install`, no framework. Editing means opening `index.html
 ## Known limits
 
 - One device only. Moving between phones is a manual backup and restore.
-- Card instalments follow calendar months, not the statement closing date. A purchase is dated with the day it happened, anywhere from twelve months back to today, and a single choice says whether it lands on that month's bill or the next one, which is how you handle buying after the card closed.
+- A card bill covers the days between two closing dates, and it is filed under the month it is paid, the way a bank statement is. A purchase after the closing day therefore lands on the next bill, which the app works out on its own from the purchase date. Cards from before this existed assume a closing day one week before the due day until you correct it.
 - A card bill is settled as a whole. There is no partial payment, and paying it does not create an entry in any envelope — the bill is already committed money on its own.
 - Saving the backup relies on the browser downloading a file. Inside an iOS home-screen app that sometimes opens the JSON in a viewer instead of saving it, and the text box behind `Ver a cópia como texto` is the way out.
 - The projection starts from what this app knows, not from your bank: cash on hand is what has come in minus what has been logged out. It answers "does this month work out", not "what is my balance".
