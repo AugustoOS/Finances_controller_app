@@ -362,6 +362,20 @@ button.lanc:active,button.mov:active{background:var(--press)}
 .tab[aria-current=true] svg{background:var(--soft2)}
 .nav-mes.eng svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .tab[aria-current=true]{color:var(--brand)}
+.atualiza{
+  position:fixed;left:var(--pad);right:var(--pad);
+  bottom:calc(96px + env(safe-area-inset-bottom));
+  z-index:55;display:flex;align-items:center;gap:12px;
+  background:var(--brand);color:var(--on-brand);
+  padding:12px 14px;border-radius:var(--radius);
+  box-shadow:0 8px 24px rgba(10,12,16,.22);font-size:14px;
+}
+.atualiza[hidden]{display:none}
+.atualiza b{flex:1;font-weight:600}
+.atualiza button{
+  flex:none;background:var(--on-brand);color:var(--brand);
+  border-radius:10px;padding:9px 15px;font-weight:650;font-size:14px;
+}
 .toast{
   position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));
   transform:translate(-50%,10px);z-index:60;
@@ -422,6 +436,7 @@ button.lanc:active,button.mov:active{background:var(--press)}
   .sheet.on{transform:translate(-50%,-50%) scale(1);opacity:1;pointer-events:auto}
   .puxador{display:none}
   .toast{left:calc(var(--lateral) + (100vw - var(--lateral)) / 2);bottom:36px}
+  .atualiza{left:calc(var(--lateral) + 40px);right:40px;bottom:36px;max-width:640px}
 }
 
 /* ---------- mouse: estados de hover ---------- */
@@ -462,6 +477,10 @@ button.lanc:active,button.mov:active{background:var(--press)}
 
 <div class="backdrop" id="backdrop"></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true"></div>
+<div class="atualiza" id="atualiza" hidden>
+  <b>Tem uma versão nova do app</b>
+  <button data-act="atualizar">Atualizar</button>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -469,7 +488,7 @@ button.lanc:active,button.mov:active{background:var(--press)}
 "use strict";
 
 /* ========== armazenamento ========== */
-var BUILD = "2026-09-08.8";
+var BUILD = "2026-09-08.9";
 var KEY = "finances.v1";
 var KEY_ANTIGA = "reparticao.v1";   /* cópia da primeira versão, lida uma vez */
 var CORES = ["#1B3A6B","#2E7D8F","#1E8E63","#7A6BB5","#C07C1E","#B23B2E","#4B5563","#8A5A3B"];
@@ -2277,6 +2296,7 @@ function viewAjustes(b){
     '<button class="acao perigo" data-act="limpar-antigos">Apagar o que tem mais de 12 meses</button>'+
     '<button class="acao perigo" data-act="limpar-mes">Apagar os lançamentos deste mês</button>'+
     '<button class="acao perigo" data-act="zerar">Apagar tudo e recomeçar</button>'+
+    '<button class="acao leve" data-act="buscar-versao">Procurar versão nova</button>'+
     '<p class="sub" style="margin-top:22px;text-align:center">Finances controller · feito pro seu bolso, não pra nuvem<br>versão '+BUILD+'</p>';
   if(S.verTexto) document.getElementById("bk").value = JSON.stringify(dados());
 }
@@ -2948,11 +2968,22 @@ document.addEventListener("click", function(ev){
     S.mes = chaveMes(d); render(); return;
   }
 
+  if(a === "atualizar"){ aplicarAtualizacao(); return; }
   if(a === "ir-ajustes"){ S.aba = "ajustes"; render(); return; }
   if(a === "ir-aba"){ fecharSheet(); irParaAba(el.dataset.aba || "mes"); return; }
   if(a === "ir-historico"){ S.aba = "historico"; render(); return; }
   if(a === "ir-mes"){ S.mes = el.dataset.mes; S.aba = el.dataset.aba || "mes"; render(); return; }
   if(a === "ver-texto"){ S.verTexto = !S.verTexto; render(); return; }
+  if(a === "buscar-versao"){
+    ultimaChecagem = 0;
+    var antes = document.getElementById("atualiza");
+    toast("Procurando...");
+    verificarVersao();
+    setTimeout(function(){
+      if(antes && antes.hidden) toast("Você já está na versão " + BUILD);
+    }, 2500);
+    return;
+  }
   if(a === "baixar"){
     try{
       var texto = JSON.stringify(dados());
@@ -3604,6 +3635,7 @@ document.addEventListener("keydown", function(e){
 
 carregar();
 aplicarTema();
+setTimeout(verificarVersao, 1500);
 S.aba = S.prefs.abaInicial || "mes";
 render();
 
@@ -3612,6 +3644,54 @@ render();
    Aqui ele é desligado e qualquer registro antigo é apagado junto com o cache. */
 var EM_DESENVOLVIMENTO = location.protocol === "file:" ||
   /^(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)$/.test(location.hostname);
+
+/* O atalho da tela inicial, no iOS principalmente, costuma voltar de onde parou
+   em vez de recarregar, e aí nunca pede o arquivo novo. Então o próprio app
+   pergunta ao servidor qual é a versão publicada, ao abrir e toda vez que volta
+   para a frente, e oferece atualizar. Os seus dados ficam onde estão. */
+var ultimaChecagem = 0, checando = false;
+
+function verificarVersao(){
+  if(EM_DESENVOLVIMENTO || checando) return;
+  if(navigator.onLine === false) return;
+  var agora = Date.now();
+  if(agora - ultimaChecagem < 300000) return;   /* no máximo de 5 em 5 minutos */
+  ultimaChecagem = agora;
+  checando = true;
+  fetch("index.html?v=" + agora, {cache:"no-store"})
+    .then(function(r){ return r.ok ? r.text() : null; })
+    .then(function(txt){
+      checando = false;
+      if(!txt) return;
+      /* o padrão é montado na hora para o próprio arquivo não casar consigo mesmo */
+      var m = txt.match(new RegExp("var " + 'BUILD = "([^"]+)"'));
+      if(m && m[1] !== BUILD) mostrarAtualizacao();
+    })
+    .catch(function(){ checando = false; });
+}
+
+function mostrarAtualizacao(){
+  var barra = document.getElementById("atualiza");
+  if(barra) barra.hidden = false;
+}
+
+function aplicarAtualizacao(){
+  var recarrega = function(){ location.reload(); };
+  try{
+    if(window.caches && caches.keys){
+      caches.keys()
+        .then(function(ks){ return Promise.all(ks.map(function(k){ return caches.delete(k); })); })
+        .then(recarrega, recarrega);
+      return;
+    }
+  }catch(e){}
+  recarrega();
+}
+
+document.addEventListener("visibilitychange", function(){
+  if(!document.hidden) verificarVersao();
+});
+window.addEventListener("focus", verificarVersao);
 
 if("serviceWorker" in navigator){
   if(EM_DESENVOLVIMENTO){

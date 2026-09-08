@@ -1,4 +1,4 @@
-var CACHE = "finances-controller-v3";
+var CACHE = "finances-controller-v4";
 var ARQUIVOS = ["./", "index.html", "manifest.webmanifest", "icon-180.png", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", function(e){
@@ -23,11 +23,15 @@ function ehApp(url){
 
 self.addEventListener("fetch", function(e){
   if(e.request.method !== "GET") return;
+  /* pedido com ?query é a checagem de versão: passa direto e não suja o cache */
+  var temQuery = new URL(e.request.url).search !== "";
   if(e.request.mode === "navigate" || ehApp(e.request.url)){
     e.respondWith(
       fetch(e.request, {cache:"no-store"}).then(function(res){
-        var copia = res.clone();
-        caches.open(CACHE).then(function(c){ c.put(e.request, copia); }).catch(function(){});
+        if(!temQuery){
+          var copia = res.clone();
+          caches.open(CACHE).then(function(c){ c.put(e.request, copia); }).catch(function(){});
+        }
         return res;
       }).catch(function(){
         return caches.match(e.request).then(function(hit){ return hit || caches.match("index.html"); });
