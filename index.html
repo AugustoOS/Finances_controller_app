@@ -488,7 +488,7 @@ button.lanc:active,button.mov:active{background:var(--press)}
 "use strict";
 
 /* ========== armazenamento ========== */
-var BUILD = "2026-09-08.9";
+var BUILD = "2026-09-09.2";
 var KEY = "finances.v1";
 var KEY_ANTIGA = "reparticao.v1";   /* cópia da primeira versão, lida uma vez */
 var CORES = ["#1B3A6B","#2E7D8F","#1E8E63","#7A6BB5","#C07C1E","#B23B2E","#4B5563","#8A5A3B"];
@@ -513,7 +513,8 @@ var S = {
   prefs: {tema:"auto", textoGrande:false, abaInicial:"mes"},
   mes: chaveMes(hoje),
   aba: "mes",
-  verTexto: false
+  verTexto: false,
+  importacao: null
 };
 var ABAS_INICIO = [["mes","Mês"],["agenda","Agenda"],["part","Repartições"],["cartao","Cartão"],["cofre","Cofre"]];
 
@@ -541,6 +542,16 @@ function dataBR(iso){
   return p.length === 3 ? p[2] + "/" + p[1] + "/" + p[0] : String(iso);
 }
 function hojeISO(){ return dataISO(new Date()); }
+/* carimbo de quando o registro foi feito: dia, mês, ano, hora e minuto */
+function agoraISO(){
+  var d = new Date();
+  return dataISO(d) + "T" + String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
+}
+function fmtQuando(iso){
+  if(!iso) return "";
+  var p = String(iso).split("T");
+  return p.length > 1 ? dataBR(p[0]) + " às " + p[1].slice(0,5) : dataBR(p[0]);
+}
 function mesesAtrasISO(n){
   var d = new Date();
   d.setMonth(d.getMonth() - n);
@@ -866,19 +877,33 @@ function parcelaNoMes(c, m){
 }
 /* Uma fatura pode estar sem pagar, paga pela metade ou quitada. Guardamos true
    quando foi quitada de uma vez, ou o valor já pago quando foi em partes. */
-function pagoDaFatura(cid, m, total){
+/* Cada pagamento fica guardado com valor e carimbo. Arquivos antigos guardavam
+   true, para fatura quitada de uma vez, ou só um número, e os dois continuam valendo. */
+function pagosDaFatura(cid, m){
   var v = S.faturas[cid + "|" + m];
-  if(v === true) return total === undefined ? montarFatura(cid, m).total : total;
+  if(Array.isArray(v)) return v;
+  if(v === true) return null;
   var n = Number(v);
-  return (isFinite(n) && n > 0) ? Math.round(n * 100) / 100 : 0;
+  return (isFinite(n) && n > 0) ? [{valor: Math.round(n * 100) / 100}] : [];
+}
+function pagoDaFatura(cid, m, total){
+  var lista = pagosDaFatura(cid, m);
+  if(lista === null) return total === undefined ? montarFatura(cid, m).total : total;
+  return Math.round(lista.reduce(function(t,p){ return t + (Number(p.valor)||0); }, 0) * 100) / 100;
+}
+function registrarPagamento(cid, m, valor, quando){
+  var lista = pagosDaFatura(cid, m);
+  if(lista === null) return;   /* já estava quitada de uma vez */
+  lista = lista.concat([{valor: Math.round(valor * 100) / 100, em: quando || agoraISO()}]);
+  S.faturas[cid + "|" + m] = lista;
 }
 function faturaPaga(cid, m){
   var v = S.faturas[cid + "|" + m];
   if(v === true) return true;
-  var n = Number(v);
-  if(!(isFinite(n) && n > 0)) return false;
+  var pago = pagoDaFatura(cid, m, null);
+  if(!(pago > 0)) return false;
   var tot = montarFatura(cid, m).total;
-  return tot > 0 && n >= tot - 0.005;
+  return tot > 0 && pago >= tot - 0.005;
 }
 function faturaDoCartao(cid, m){
   var f = montarFatura(cid, m);
@@ -1025,7 +1050,11 @@ function parcelaEmprestimo(e, m){
   var k = mesesEntre(e.inicio || m, m) + 1;
   return (k >= 1 && k <= nParcelasEmp(e)) ? k : 0;
 }
-function parcelaEmpPaga(e, m){ return !!(e.pagas && e.pagas[m] === true); }
+function parcelaEmpPaga(e, m){ return !!(e.pagas && e.pagas[m]); }
+function quandoPagouEmp(e, m){
+  var v = e && e.pagas && e.pagas[m];
+  return (typeof v === "string" && v.indexOf("T") > 0) ? v : "";
+}
 function emprestimosDoMes(m){
   var itens = [], total = 0, pago = 0;
   S.emprestimos.forEach(function(e){
@@ -1057,6 +1086,162 @@ function saldoEmprestimo(e){
 }
 function dividaTotal(){
   return Math.round(S.emprestimos.reduce(function(t,e){ return t + saldoEmprestimo(e).saldo; }, 0) * 100) / 100;
+}
+
+/* ---- importar a fatura do banco ---- */
+/* CSV de verdade: campo entre aspas pode ter vírgula e aspas dobradas dentro */
+function lerLinhaCsv(linha){
+  var campos = [], atual = "", dentro = false;
+  for(var i=0;i<linha.length;i++){
+    var ch = linha[i];
+    if(dentro){
+      if(ch === '"'){
+        if(linha[i+1] === '"'){ atual += '"'; i++; }
+        else dentro = false;
+      }else atual += ch;
+    }else{
+      if(ch === '"') dentro = true;
+      else if(ch === ","){ campos.push(atual); atual = ""; }
+      else atual += ch;
+    }
+  }
+  campos.push(atual);
+  return campos;
+}
+function valorCsv(txt){
+  var t = String(txt).replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
+  var v = parseFloat(t);
+  return isFinite(v) ? Math.round(v * 100) / 100 : 0;
+}
+/* "Ponto M - Parcela 4/10", "iFood Delivery - NuPay - 2/2", "EBW*Temu - NuPay - Parcela 2/3" */
+function lerParcelaDoTitulo(titulo){
+  var m = String(titulo).match(/^(.*?)\s*-\s*(?:NuPay\s*-\s*)?(?:Parcela\s*)?(\d{1,2})\/(\d{1,2})\s*$/);
+  return m ? {nome:m[1].trim(), k:+m[2], de:+m[3]} : null;
+}
+function ehPagamento(titulo){ return /^\s*pagamento\s+recebido/i.test(String(titulo)); }
+
+function lerCsvDoBanco(texto){
+  var linhas = String(texto).replace(/\r/g, "").split("\n").filter(function(l){ return l.trim(); });
+  if(linhas.length < 2) return {erro:"O arquivo está vazio."};
+  var cab = lerLinhaCsv(linhas[0]).map(function(c){ return c.trim().toLowerCase(); });
+  var acha = function(nomes){
+    for(var i=0;i<nomes.length;i++){ var p = cab.indexOf(nomes[i]); if(p > -1) return p; }
+    return -1;
+  };
+  var iD = acha(["date","data"]), iT = acha(["title","descrição","descricao","título","titulo"]),
+      iV = acha(["amount","valor"]);
+  if(iD < 0 || iT < 0 || iV < 0)
+    return {erro:"Não reconheci as colunas. O arquivo precisa ter data, título e valor."};
+  var itens = [];
+  for(var i=1;i<linhas.length;i++){
+    var c = lerLinhaCsv(linhas[i]);
+    if(c.length <= Math.max(iD, iT, iV)) continue;
+    var data = c[iD].trim();
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(data)) continue;
+    itens.push({data:data, titulo:c[iT].trim(), valor:valorCsv(c[iV])});
+  }
+  return itens.length ? {itens:itens} : {erro:"Não achei nenhum lançamento com data no arquivo."};
+}
+
+/* Monta o que seria criado, sem mexer em nada ainda. */
+function planejarImportacao(itens, ct){
+  var porFatura = {};
+  var pega = function(m){
+    return porFatura[m] = porFatura[m] || {mes:m, parcelas:[], avulsos:[], pago:0, total:0};
+  };
+  itens.forEach(function(it){
+    var m = faturaDaData(ct, it.data), f = pega(m);
+    if(ehPagamento(it.titulo)){ f.pago += -it.valor; return; }
+    f.total += it.valor;
+    var p = lerParcelaDoTitulo(it.titulo);
+    if(p) f.parcelas.push({nome:p.nome, k:p.k, de:p.de, valor:it.valor, data:it.data});
+    else f.avulsos.push({nome:it.titulo, valor:it.valor, data:it.data});
+  });
+
+  var usados = {}, criar = [], pagamentos = [], jaTem = 0, meses = Object.keys(porFatura).sort();
+
+  meses.forEach(function(m){
+    var f = porFatura[m];
+    f.total = Math.round(f.total * 100) / 100;
+    f.pago = Math.round(f.pago * 100) / 100;
+
+    f.parcelas.forEach(function(p){
+      var inicio = mesVizinho(m, -(p.k - 1));
+      var achou = S.comprasCartao.filter(function(c){
+        return !usados[c.id] && c.cartao === ct.id && nParcelas(c) === p.de &&
+          inicioDaCompra(c) === inicio && Math.abs(valorParcela(c, 1) - p.valor) < 0.03;
+      })[0];
+      if(achou){ usados[achou.id] = true; jaTem++; return; }
+      if(criar.some(function(x){ return x.parcelas === p.de && x.inicio === inicio && Math.abs(x.valorParcela - p.valor) < 0.03; })) return;
+      criar.push({
+        nome:p.nome, parcelas:p.de, inicio:inicio, valorParcela:p.valor,
+        total: Math.round(p.valor * p.de * 100) / 100, fatura:m
+      });
+    });
+
+    /* estorno do mesmo estabelecimento abate a compra: junta só quando há valor negativo */
+    var porNome = {};
+    f.avulsos.forEach(function(a){
+      var ch = a.nome.toLowerCase();
+      (porNome[ch] = porNome[ch] || []).push(a);
+    });
+    Object.keys(porNome).forEach(function(ch){
+      var grupo = porNome[ch];
+      var lotes = grupo.some(function(a){ return a.valor < 0; })
+        ? [{nome:grupo[0].nome, data:grupo[grupo.length-1].data,
+            valor: Math.round(grupo.reduce(function(t,a){ return t + a.valor; }, 0) * 100) / 100,
+            juntou: grupo.length}]
+        : grupo;
+      lotes.forEach(function(a){
+        if(a.valor <= 0.005) return;
+        var achou = S.comprasCartao.filter(function(c){
+          return !usados[c.id] && c.cartao === ct.id && nParcelas(c) === 1 &&
+            faturaDaData(ct, c.data || (c.inicio + "-15")) === m &&
+            Math.abs((Number(c.total)||0) - a.valor) < 0.06;
+        })[0];
+        if(achou){ usados[achou.id] = true; jaTem++; return; }
+        criar.push({nome:a.nome, parcelas:1, data:a.data, valorParcela:a.valor, valor:a.valor,
+          total:a.valor, fatura:m, juntou:a.juntou});
+      });
+    });
+
+    if(f.pago > 0.005){
+      var jaPago = pagoDaFatura(ct.id, m);
+      var falta = Math.round((f.pago - jaPago) * 100) / 100;
+      if(falta > 0.005) pagamentos.push({mes:m, valor:falta, total:f.pago, jaPago:jaPago});
+    }
+  });
+
+  return {
+    meses:meses, faturas:porFatura, criar:criar, pagamentos:pagamentos,
+    jaTem:jaTem, linhas:itens.length,
+    /* o que entra na fatura deste arquivo */
+    novoNaFatura: Math.round(criar.reduce(function(t,x){
+      return t + (x.parcelas > 1 ? x.valorParcela : x.total);
+    }, 0) * 100) / 100,
+    /* e o compromisso inteiro que as compras parceladas trazem junto */
+    novoTotal: Math.round(criar.reduce(function(t,x){ return t + x.total; }, 0) * 100) / 100
+  };
+}
+
+function aplicarImportacao(plano, ct){
+  var carimbo = agoraISO(), n = 0;
+  plano.criar.forEach(function(x){
+    var compra = {
+      id:uid(), cartao:ct.id, nome:x.nome, total:x.total,
+      parcelas:x.parcelas, em:carimbo, importado:true
+    };
+    if(x.parcelas === 1 && x.data) compra.data = x.data;
+    else compra.inicio = x.inicio;
+    S.comprasCartao.push(compra);
+    n++;
+  });
+  plano.pagamentos.forEach(function(p){
+    registrarPagamento(ct.id, p.mes, p.valor, carimbo);
+    n++;
+  });
+  salvar();
+  return n;
 }
 
 /* ---- cofrinho ---- */
@@ -1982,6 +2167,8 @@ function viewCartao(b){
 
   html += blocoConselhos(m, b, "Lembretes do cartão", null, ["cartao"], 4)+
     '<button class="acao" data-act="nova-compra">Lançar compra no cartão</button>'+
+    '<button class="acao leve" data-act="importar-csv">Importar fatura do banco</button>'+
+    '<input type="file" id="arqCsv" accept=".csv,text/csv" style="display:none">'+
     '<button class="acao leve" data-act="novo-cartao">Adicionar cartão</button>';
   view.innerHTML = html;
 }
@@ -2071,7 +2258,8 @@ function viewEmprestimos(b){
     html += '<label>Vencem em '+nomeMes(m)+'</label><div class="lista" style="padding:2px 14px">'+
       doMes.itens.map(function(x){
         return '<div class="lanc"><span>'+esc(x.emp.nome || "Empréstimo")+
-            '<small>dia '+x.dia+' · parcela '+x.n+' de '+x.de+'</small></span>'+
+            '<small>dia '+x.dia+' · parcela '+x.n+' de '+x.de+
+            (x.pago && quandoPagouEmp(x.emp, m) ? ' · paga em '+esc(fmtQuando(quandoPagouEmp(x.emp, m))) : '')+'</small></span>'+
           '<span class="num">'+fmt(x.valor)+' '+
           (x.pago
             ? '<button data-act="desmarcar-emprestimo" data-id="'+x.emp.id+'" style="color:var(--muted);font-size:13px">desfazer</button>'
@@ -2126,7 +2314,7 @@ function viewCofre(b){
     html += '<label>Movimentos de '+nomeMes(m)+'</label>'+
       '<div class="lista" style="padding:2px 14px">'+movs.map(function(mv){
         var v = Number(mv.valor)||0;
-        return '<button class="mov" data-act="abrir-mov" data-id="'+mv.id+'"><span>'+esc(mv.nota || (v < 0 ? "resgate" : "depósito"))+'<small>'+(mv.dia||"")+' · toque para editar</small></span>'+
+        return '<button class="mov" data-act="abrir-mov" data-id="'+mv.id+'"><span>'+esc(mv.nota || (v < 0 ? "resgate" : "depósito"))+'<small>'+esc(mv.em ? fmtQuando(mv.em) : (mv.dia||""))+' · toque para editar</small></span>'+
           '<span class="num"><b'+(v < 0 ? ' class="tira"' : '')+'>'+fmt(v)+'</b> '+
           '</span></button>';
       }).join("")+'</div>';
@@ -2636,6 +2824,47 @@ function atualizarDicaEmp(){
     : n + "x de " + fmt(v) + " · total " + fmt(Math.round(n * v * 100) / 100);
 }
 
+function sheetImportar(plano, ct, arquivo){
+  var linhas = plano.meses.map(function(m){
+    var f = plano.faturas[m];
+    var novas = plano.criar.filter(function(x){ return x.fatura === m; });
+    var pg = plano.pagamentos.filter(function(p){ return p.mes === m; })[0];
+    return '<div class="dado forte"><span>Fatura de '+nomeMes(m)+'</span><b class="num">'+fmt(f.total)+'</b></div>'+
+      '<div class="dado"><span>Lançamentos novos</span><b class="num">'+novas.length+'</b></div>'+
+      (pg ? '<div class="dado"><span>Pagamento a registrar</span><b class="num">'+fmt(pg.valor)+'</b></div>' : '');
+  }).join("");
+
+  abrirSheet(
+    '<h3>Importar fatura</h3>'+
+    '<p class="sub">'+esc(arquivo || "arquivo")+' · '+plano.linhas+' linhas lidas · cartão '+esc(ct.nome)+
+      '. Nada foi gravado ainda: confira e confirme.</p>'+
+    '<div class="dados">'+linhas+'</div>'+
+    '<div class="dados">'+
+      linha("Vou criar", plano.criar.length + (plano.criar.length === 1 ? " lançamento" : " lançamentos"), true)+
+      linha("Disso, cai nesta fatura", fmt(plano.novoNaFatura))+
+      (plano.novoTotal > plano.novoNaFatura + 0.005
+        ? linha("Compromisso até o fim das parcelas", fmt(plano.novoTotal)) : "")+
+      linha("Já estavam no app", plano.jaTem + (plano.jaTem === 1 ? " lançamento" : " lançamentos"))+
+    '</div>'+
+    (plano.criar.length
+      ? '<label>O que vai entrar</label><div class="lista" style="padding:2px 14px">'+
+        plano.criar.map(function(x){
+          return '<div class="lanc"><span>'+esc(x.nome)+
+            '<small>'+(x.parcelas > 1
+              ? x.parcelas+'x de '+fmt(x.valorParcela)+' a partir de '+nomeMes(x.inicio)
+              : (x.juntou ? x.juntou+' linhas somadas, com estorno' : 'à vista em '+dataBR(x.data)))+'</small></span>'+
+            '<span class="num">'+fmt(x.total)+'</span></div>';
+        }).join("")+'</div>'
+      : '<div class="vazio">Tudo que está no arquivo já está no app. Nada a fazer.</div>')+
+    '<p class="dica-campo">Parcelas viram compras parceladas com o mês certo de início. Estornos abatem a compra do mesmo estabelecimento. O que já existe não é duplicado.</p>'+
+    (plano.criar.length || plano.pagamentos.length
+      ? '<button class="acao" data-act="confirmar-importacao" data-id="'+ct.id+'">Importar</button>'
+      : ''),
+    null
+  );
+  S.importacao = {plano:plano, cid:ct.id};
+}
+
 function sheetPagarFatura(cid, m){
   var ct = cartaoPorId(cid);
   if(!ct) return;
@@ -2652,6 +2881,15 @@ function sheetPagarFatura(cid, m){
     '<label for="fpv">Quanto está pagando</label>'+
     '<input id="fpv" inputmode="decimal" value="'+(f.aberto > 0 ? String(f.aberto).replace(".",",") : "")+'" placeholder="0,00">'+
     '<p class="dica-campo">Pode ser uma parte só. Cada pagamento soma no que já foi pago desta fatura.</p>'+
+    (function(){
+      var lista = pagosDaFatura(cid, m);
+      if(!lista || !lista.length) return "";
+      return '<label>Pagamentos desta fatura</label><div class="lista" style="padding:2px 14px">'+
+        lista.map(function(p){
+          return '<div class="lanc"><span>'+(p.em ? esc(fmtQuando(p.em)) : "sem data registrada")+'</span>'+
+            '<span class="num">'+fmt(p.valor)+'</span></div>';
+        }).join("")+'</div>';
+    })()+
     '<button class="acao" data-act="salvar-pagamento" data-id="'+cid+'" data-mes="'+m+'">Registrar pagamento</button>'+
     '<button class="acao leve" data-act="quitar-fatura" data-id="'+cid+'" data-mes="'+m+'">Quitar a fatura inteira</button>'+
     (f.pagoValor > 0
@@ -2768,7 +3006,7 @@ function sheetAvulsos(){
               '<span class="item-nome"><em>'+esc(g.nota || "gasto sem nome")+'</em></span>'+
               '<span class="item-val num">'+fmt(g.valor)+'</span>'+
             '</div>'+
-            '<div class="item-pe"><span>'+esc(g.dia || "")+(meioDePagamento(g) ? ' · ' + meioDePagamento(g) : '')+'</span>'+
+            '<div class="item-pe"><span>'+esc(g.em ? fmtQuando(g.em) : (g.dia || ""))+(meioDePagamento(g) ? ' · ' + meioDePagamento(g) : '')+'</span>'+
               '<span>'+origemDoAvulso(m, g)+'</span></div>'+
           '</button>';
         }).join("")+'</div>'
@@ -2790,7 +3028,7 @@ function sheetGasto(gid){
   var meio = meioDePagamento(g);
   abrirSheet(
     '<h3>'+esc(g.nota || (part ? part.nome : "Gasto"))+'</h3>'+
-    '<p class="sub">Lançado em '+esc(g.dia || nomeMes(m))+', '+esc(origem)+
+    '<p class="sub">Lançado em '+esc(g.em ? fmtQuando(g.em) : (g.dia || nomeMes(m)))+', '+esc(origem)+
       (meio ? ', pago ' + esc(meio) : '')+'. Dá pra mudar o valor, o nome, o dia, como foi pago e onde ele conta.</p>'+
     '<div class="linha2">'+
       '<div><label for="av">Valor</label>'+
@@ -2826,7 +3064,7 @@ function sheetMov(id){
   var v = Number(mv.valor)||0;
   abrirSheet(
     '<h3>'+esc(mv.nota || (v < 0 ? "Resgate" : "Depósito"))+'</h3>'+
-    '<p class="sub">Movimento do cofrinho em '+nomeMes(m)+(mv.dia ? ', dia '+esc(mv.dia) : '')+'. O cofrinho tem '+fmt(totalCofre())+' hoje.</p>'+
+    '<p class="sub">Movimento do cofrinho em '+nomeMes(m)+(mv.em ? ', registrado em '+esc(fmtQuando(mv.em)) : (mv.dia ? ', dia '+esc(mv.dia) : ''))+'. O cofrinho tem '+fmt(totalCofre())+' hoje.</p>'+
     '<label for="mt">Tipo</label>'+
     '<select id="mt">'+
       '<option value="1"'+(v >= 0 ? ' selected' : '')+'>Guardei no cofrinho</option>'+
@@ -2948,7 +3186,8 @@ function addGasto(pid, valor, nota, parc, cartao, fatMes){
   if(!S.gastos[S.mes]) S.gastos[S.mes] = [];
   var g = {
     id:uid(), pid:pid||null, valor:valor, nota:nota||"",
-    dia: new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})
+    dia: new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"}),
+    em: agoraISO()
   };
   if(parc) g.parc = parc;
   if(cartao){ g.cartao = cartao; g.fatMes = fatMes || S.mes; }
@@ -3005,6 +3244,22 @@ document.addEventListener("click", function(ev){
     }
     return;
   }
+  if(a === "importar-csv"){
+    if(!S.cartoes.length){ toast("Cadastre um cartão primeiro"); sheetCartao(null); return; }
+    var campoCsv = document.getElementById("arqCsv");
+    if(campoCsv) campoCsv.click();
+    return;
+  }
+  if(a === "confirmar-importacao"){
+    var imp = S.importacao;
+    if(!imp || imp.cid !== el.dataset.id){ toast("Abra o arquivo de novo"); return; }
+    var ctImp = cartaoPorId(imp.cid);
+    var quantos = aplicarImportacao(imp.plano, ctImp);
+    S.importacao = null;
+    fecharSheet(); irParaAba("cartao");
+    toast(quantos + (quantos === 1 ? " lançamento importado" : " lançamentos importados"));
+    return;
+  }
   if(a === "abrir-arquivo"){
     var campo = document.getElementById("arq");
     if(campo) campo.click();
@@ -3047,7 +3302,7 @@ document.addEventListener("click", function(ev){
     }else{
       S.emprestimos.push({
         id:uid(), nome:emNome, credor:emCredor, valorParcela:emVal,
-        parcelas:emQtd, inicio:emIni, dia:emDia, pagas:{}, cor:emCor
+        parcelas:emQtd, inicio:emIni, dia:emDia, pagas:{}, cor:emCor, em:agoraISO()
       });
     }
     salvar(); fecharSheet(); irParaAba("emprestimo");
@@ -3059,7 +3314,7 @@ document.addEventListener("click", function(ev){
     S.emprestimos.forEach(function(x){
       if(x.id !== epId) return;
       if(!x.pagas) x.pagas = {};
-      if(marcando) x.pagas[S.mes] = true;
+      if(marcando) x.pagas[S.mes] = agoraISO();
       else delete x.pagas[S.mes];
     });
     salvar(); fecharSheet(); render();
@@ -3161,7 +3416,7 @@ document.addEventListener("click", function(ev){
     }else{
       S.comprasCartao.push({
         id:uid(), cartao:cpCid, nome:cpNome, total:cpTot,
-        parcelas:cpN, data:cpData, inicio:cpIni
+        parcelas:cpN, data:cpData, inicio:cpIni, em:agoraISO()
       });
     }
     salvar(); fecharSheet(); S.aba = "cartao"; render();
@@ -3184,9 +3439,7 @@ document.addEventListener("click", function(ev){
     var pgCid = el.dataset.id, pgMes = el.dataset.mes || S.mes;
     var pgVal = parseNum(document.getElementById("fpv").value);
     if(pgVal <= 0){ toast("Coloque um valor maior que zero"); return; }
-    var fPg = faturaDoCartao(pgCid, pgMes);
-    var soma = Math.round((fPg.pagoValor + pgVal) * 100) / 100;
-    S.faturas[pgCid + "|" + pgMes] = soma >= fPg.total - 0.005 && fPg.total > 0 ? true : soma;
+    registrarPagamento(pgCid, pgMes, pgVal);
     salvar(); fecharSheet(); render();
     var depois = faturaDoCartao(pgCid, pgMes);
     toast(depois.pago ? "Fatura quitada" : "Pago " + fmt(pgVal) + ", faltam " + fmt(depois.aberto));
@@ -3220,7 +3473,8 @@ document.addEventListener("click", function(ev){
     S.cofre.movimentos.push({
       id:uid(), mes:S.mes, valor: sinal * mvVal,
       nota: document.getElementById("mn").value.trim(),
-      dia: new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})
+      dia: new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"}),
+      em: agoraISO()
     });
     salvar(); fecharSheet(); render();
     toast(sinal > 0 ? "Guardado " + fmt(mvVal) : "Resgatado " + fmt(mvVal));
@@ -3299,7 +3553,7 @@ document.addEventListener("click", function(ev){
       else delete x.recebido;
     });
     if(!achouG){
-      var novoG = {id:gId, nome:gNome, valor:gValor, dia:gDia};
+      var novoG = {id:gId, nome:gNome, valor:gValor, dia:gDia, em:agoraISO()};
       if(sitG === "sim") novoG.recebido = true;
       if(sitG === "nao") novoG.recebido = false;
       listaG.push(novoG);
@@ -3503,14 +3757,14 @@ document.addEventListener("click", function(ev){
     if(iid){
       S.compras.forEach(function(c){ if(c.id===iid){ c.nome=inome; c.preco=ipreco; c.prio=iprio; } });
     }else{
-      S.compras.push({id:uid(), nome:inome, preco:ipreco, prio:iprio, compradoEm:null});
+      S.compras.push({id:uid(), nome:inome, preco:ipreco, prio:iprio, compradoEm:null, em:agoraISO()});
     }
     salvar(); fecharSheet(); render(); toast("Item salvo"); return;
   }
   if(a === "comprar"){
     var cid = el.dataset.id;
     S.compras.forEach(function(c){
-      if(c.id===cid){ c.compradoEm = S.mes; addGasto(null, Number(c.preco)||0, c.nome); }
+      if(c.id===cid){ c.compradoEm = S.mes; c.compradoQuando = agoraISO(); addGasto(null, Number(c.preco)||0, c.nome); }
     });
     salvar(); fecharSheet(); render(); toast("Comprado e lançado no mês"); return;
   }
@@ -3577,6 +3831,20 @@ document.addEventListener("click", function(ev){
 
 document.addEventListener("change", function(ev){
   var campo = ev.target;
+  if(campo && campo.id === "arqCsv" && campo.files && campo.files[0]){
+    var arq = campo.files[0];
+    var leitorCsv = new FileReader();
+    leitorCsv.onload = function(){
+      var lido = lerCsvDoBanco(String(leitorCsv.result));
+      if(lido.erro){ toast(lido.erro); return; }
+      var ctAtual = cartaoPorId((S.cartoes[0] || {}).id);
+      sheetImportar(planejarImportacao(lido.itens, ctAtual), ctAtual, arq.name);
+    };
+    leitorCsv.onerror = function(){ toast("Não consegui ler esse arquivo"); };
+    leitorCsv.readAsText(arq);
+    campo.value = "";
+    return;
+  }
   if(!campo || campo.id !== "arq" || !campo.files || !campo.files[0]) return;
   var leitor = new FileReader();
   leitor.onload = function(){

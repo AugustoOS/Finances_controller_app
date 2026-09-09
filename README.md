@@ -45,6 +45,10 @@ Instalments and card-paid expenses are counted exactly once. The envelopes alrea
 
 A card's spending room is its limit minus whatever slice of it has been converted into a reserve at the bank, which some banks let you do to save; the app keeps both numbers so the headline limit stays true while the room to spend shrinks by the converted part.
 
+A bill exported from the bank as CSV can be imported straight into the card. Lines reading `Parcela 4/10` are recognised as one instalment plan and become a single purchase starting in the right month; refunds cancel out against the charge from the same merchant; `Pagamento recebido` becomes a payment on that bill. The app shows what it is about to create before touching anything, and skips whatever is already there, so importing the same file twice changes nothing.
+
+Every entry the app records carries a stamp of the day, month, year, hour and minute it was made: expenses, piggy-bank movements, bill payments and loan instalments alike.
+
 Instalments on a purchase can be paid off ahead of time from the end of the queue: they leave every future bill, give their limit back at once, and the amount is logged as spending in the month you did it.
 
 A bill can be paid in full, in parts, or ahead of time. The card screen shows how much of it is already covered and how much is left, and any amount paid gives that much limit back immediately, which is what makes paying an open bill early worth doing.
